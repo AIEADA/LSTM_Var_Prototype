@@ -298,32 +298,3 @@ class standard_lstm(Model):
 
 if __name__ == '__main__':
     print('Architecture file')
-
-    print('Analysis results')
-
-    # Load mask
-    mask = np.asarray(np.load('mask',allow_pickle=True).data,dtype='bool')[0].flatten()
-    test_fields = np.load('test_fields.npy',allow_pickle=True).data.reshape(1487,-1)
-    # Remove mean and land points
-    test_fields = test_fields - np.mean(test_fields,axis=0)
-    test_fields = test_fields[:100,mask]
-    # Load POD modes
-    pod_modes = np.load('POD_Modes.npy')
-
-    # Predictions
-    lstm_var = np.load('./Var/Predicted.npy')[:100]
-    lstm = np.load('./Regular/Predicted.npy')[:100]
-
-    # Reconstruct
-    var_field = np.matmul(pod_modes,lstm_var.T)
-    pred_field = np.matmul(pod_modes,lstm.T)
-
-    # Difference
-    var_diff = np.sum(np.abs((test_fields-var_field.T)),axis=1)/np.shape(var_field)[0]
-    pred_diff = np.sum(np.abs((test_fields-pred_field.T)),axis=1)/np.shape(var_field)[0]
-
-    plt.figure()
-    plt.plot(pred_diff,label='Difference regular')
-    plt.plot(var_diff,label='Difference var')
-    plt.legend()
-    plt.show()
