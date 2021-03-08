@@ -15,7 +15,7 @@ pod_modes = np.load('POD_Modes.npy')
 # Just emulator
 lstm = np.load('./Regular/Predicted.npy')[:300]
 pred_field = np.matmul(pod_modes,lstm.T)
-pred_diff = np.sum(np.abs((test_fields-pred_field.T)),axis=1)/np.shape(pred_field)[0]
+pred_diff = np.sum((test_fields-pred_field.T)**2,axis=1)/np.shape(pred_field)[0]
 
 # Data assimilated
 file_list = os.listdir('./Varying_Observations/')
@@ -27,7 +27,7 @@ for file in file_list:
     # Reconstruct
     var_field = np.matmul(pod_modes,lstm_var.T)
     # Difference
-    var_diff = np.sum(np.abs((test_fields-var_field.T)),axis=1)/np.shape(var_field)[0]
+    var_diff = np.sum((test_fields-var_field.T)**2,axis=1)/np.shape(var_field)[0]
 
     var_diff_list.append(var_diff)
 
@@ -41,5 +41,7 @@ for i in range(len(file_list)):
     plt.plot(pred_diff,label='Difference regular')
     plt.plot(var_diff_list[i],label=file_list[i])
     plt.legend()
+    plt.xlabel('MSE')
+    plt.ylabel('Test snapshot')
     plt.savefig(save_name)
     plt.close()

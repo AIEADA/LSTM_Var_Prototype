@@ -199,7 +199,7 @@ class standard_lstm(Model):
         true_observations = test_fields[:,rand_idx]
 
         # 3D-Variational update
-        for t in range(100):
+        for t in range(300):
 
             # Background vector - initial time window input
             x_ti = self.preproc_pipeline.inverse_transform(rec_input_seq[0,:].reshape(self.seq_num,-1))
@@ -229,7 +229,43 @@ class standard_lstm(Model):
                 
                 return pred
 
-            solution = minimize(residual,rec_input_seq[0].flatten(),method='SLSQP',
+            # Define gradient of residual
+            def residual_gradient(x):
+                # Prior
+                x = x.reshape(self.seq_num,-1).astype('double')
+                xphys = self.preproc_pipeline.inverse_transform(x)
+                tf_x_star_rec = tf.convert_to_tensor(np.matmul(pod_modes,xphys.T),dtype='float64')#[:,0:1]
+                tf_x_ti_rec = tf.convert_to_tensor(x_ti_rec,dtype='float64')
+                tf_y_ = tf.convert_to_tensor(y_,dtype='float64')
+
+                # Likelihood
+                x = x.reshape(1,self.seq_num,-1)
+                x = tf.convert_to_tensor(x,dtype='float64')
+                tf_pod_modes = tf.convert_to_tensor(pod_modes,dtype='float64')
+
+                std_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
+                minmax_scaler = self.preproc_pipeline.get_params()['steps'][1][1]
+
+                with tf.GradientTape(persistent=True) as t:
+                    t.watch(x)
+                    
+                    op = self.call(x)
+                    op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                    op = (op)*std_scaler.scale_ + std_scaler.mean_
+                    op = tf.cast(op,dtype='float64')
+
+                    x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))[:,0]
+
+                    # Sensor predictions
+                    tf_idx = tf.convert_to_tensor(rand_idx,dtype='int32')
+                    h_ = tf.gather(x_tf_rec,tf_idx)
+
+                    # J
+                    pred = tf.math.reduce_sum(0.5*(tf_x_star_rec - tf_x_ti_rec)**2) + tf.math.reduce_sum(0.5*(tf_y_-h_)**2)
+                 
+                return t.gradient(pred, x).numpy()[0,:,:].flatten().astype('double')
+
+            solution = minimize(residual,rec_input_seq[0].flatten(),jac=residual_gradient, method='CG',
                 tol=1e-8,options={'disp': True, 'maxiter': 100, 'eps': 1.4901161193847656e-8})
 
             assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
