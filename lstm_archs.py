@@ -27,7 +27,7 @@ class standard_lstm(Model):
 
         # Inference with 3D var?
         self.var = var
-        self.num_obs = 3000
+        self.num_obs = 5000
 
         # Set up the data for the LSTM
         self.data_tsteps = np.shape(data)[0]
@@ -196,10 +196,14 @@ class standard_lstm(Model):
         np.random.shuffle(rand_idx)
         rand_idx = rand_idx[:self.num_obs]
 
+        num_grid_points = test_fields.shape[0]
+        num_observations = rand_idx.shape[0]
+        total_dof = num_grid_points + num_observations
+
         true_observations = test_fields[:,rand_idx]
 
         # 3D-Variational update
-        for t in range(300):
+        for t in range(500):
 
             # Background vector - initial time window input
             x_ti = self.preproc_pipeline.inverse_transform(rec_input_seq[0,:].reshape(self.seq_num,-1))
@@ -225,7 +229,7 @@ class standard_lstm(Model):
                 h_ = x_tf_rec[rand_idx,0]
 
                 # J
-                pred = np.sum(0.5*(x_star_rec - x_ti_rec)**2) + np.sum(0.5*(y_-h_)**2)
+                pred = 1.0/num_grid_points*(np.sum(0.5*(x_star_rec - x_ti_rec)**2)) + 1.0/num_observations*(np.sum(0.5*(y_-h_)**2))
                 
                 return pred
 
@@ -239,7 +243,7 @@ class standard_lstm(Model):
                 tf_y_ = tf.convert_to_tensor(y_,dtype='float64')
 
                 # Likelihood
-                x = x.reshape(1,self.seq_num,-1)
+                x = x.reshape(1,-1)
                 x = tf.convert_to_tensor(x,dtype='float64')
                 tf_pod_modes = tf.convert_to_tensor(pod_modes,dtype='float64')
 
@@ -248,7 +252,9 @@ class standard_lstm(Model):
 
                 with tf.GradientTape(persistent=True) as t:
                     t.watch(x)
-                    
+
+                    x = tf.reshape(x,shape=[1,self.seq_num,-1])
+
                     op = self.call(x)
                     op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
                     op = (op)*std_scaler.scale_ + std_scaler.mean_
@@ -261,18 +267,35 @@ class standard_lstm(Model):
                     h_ = tf.gather(x_tf_rec,tf_idx)
 
                     # J
-                    pred = tf.math.reduce_sum(0.5*(tf_x_star_rec - tf_x_ti_rec)**2) + tf.math.reduce_sum(0.5*(tf_y_-h_)**2)
-                 
-                return t.gradient(pred, x).numpy()[0,:,:].flatten().astype('double')
+                    pred = 1.0/num_grid_points*(tf.math.reduce_sum(0.5*(tf_x_star_rec - tf_x_ti_rec)**2)) + \
+                            1.0/num_observations*(tf.math.reduce_sum(0.5*(tf_y_-h_)**2))
 
-            solution = minimize(residual,rec_input_seq[0].flatten(),jac=residual_gradient, method='CG',
+                grad = t.gradient(pred, x).numpy()[0,:,:].flatten().astype('double')
+                 
+                return grad
+
+            solution = minimize(residual,rec_input_seq[0].flatten(), jac=residual_gradient, method='SLSQP',
                 tol=1e-8,options={'disp': True, 'maxiter': 100, 'eps': 1.4901161193847656e-8})
 
-            assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
-            rec_pred[t] = self.call(assimilated_rec_input_seq).numpy()[0].reshape(1,-1)
+            old_of = residual(rec_input_seq[0].flatten())
+            new_of = residual(solution.x)
 
-            rec_input_seq[0,0:-1,:] = assimilated_rec_input_seq[0,1:,:]
-            rec_input_seq[0,-1,:] = rec_pred[t]
+            print('Initial guess residual:',old_of, ', Final guess residual:',new_of)
+
+            if new_of< old_of:
+                assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
+                rec_pred[t] = self.call(assimilated_rec_input_seq).numpy()[0].reshape(1,-1)
+
+                rec_input_seq[0,0:-1,:] = assimilated_rec_input_seq[0,1:,:]
+                rec_input_seq[0,-1,:] = rec_pred[t]
+            else:
+
+                print('Optimization failed. Initial guess residual:',old_of, ', Final guess residual:',new_of)
+
+                rec_pred[t] = self.call(rec_input_seq).numpy()[0].reshape(1,-1)
+
+                rec_input_seq[0,0:-1,:] = rec_input_seq[0,1:,:]
+                rec_input_seq[0,-1,:] = rec_pred[t]
 
             print('Finished variational prediction for timestep: ',t)
 
