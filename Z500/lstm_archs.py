@@ -38,15 +38,16 @@ class standard_lstm(Model):
 
         # Need to make minibatches
         self.seq_num = 7
-        self.total_size = np.shape(data)[0]-int(self.seq_num) # Limit of sampling
+        self.seq_num_op = 14
+        self.total_size = np.shape(data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
 
         input_seq = np.zeros(shape=(self.total_size,self.seq_num,self.state_len))  #[samples,n_inputs,state_len]
-        output_seq = np.zeros(shape=(self.total_size,self.state_len)) #[samples,n_outputs,state_len]
+        output_seq = np.zeros(shape=(self.total_size,self.seq_num_op,self.state_len)) #[samples,n_outputs,state_len]
 
         snum = 0
         for t in range(0,self.total_size):
             input_seq[snum,:,:] = self.data[None,t:t+self.seq_num,:]
-            output_seq[snum,:] = self.data[None,t+self.seq_num,:]        
+            output_seq[snum,:] = self.data[None,t+self.seq_num:t+self.seq_num+self.seq_num_op,:]        
             snum = snum + 1
 
         # Shuffle dataset
@@ -74,16 +75,22 @@ class standard_lstm(Model):
         # Define architecture
         xavier=tf.keras.initializers.GlorotUniform()
         self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len))
-        self.l2=tf.keras.layers.LSTM(50,return_sequences=False)
+        # self.l1_transpose = tf.transpose(perm=[0,2,1])
+        self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
+        # self.l2_transpose = tf.transpose(perm=[0,2,1])
+        self.l2=tf.keras.layers.LSTM(50,return_sequences=True)
         self.out = tf.keras.layers.Dense(self.state_len)
         self.train_op = tf.keras.optimizers.Adam(learning_rate=0.001)
 
-    
+
     # Running the model
     def call(self,X):
         h1 = self.l1(X)
-        h2 = self.l2(h1)
-        out = self.out(h2)
+        h2 = tf.transpose(h1,perm=[0,2,1])
+        h3 = self.l1_transform(h2)
+        h4 = tf.transpose(h3,perm=[0,2,1])
+        h5 = self.l2(h4)
+        out = self.out(h5)
         return out
     
     # Regular MSE
@@ -115,7 +122,7 @@ class standard_lstm(Model):
         self.train_batch_size = int(self.ntrain/self.num_batches)
         self.valid_batch_size = int((self.nvalid)/self.num_batches)
         
-        for i in range(100):
+        for i in range(200):
             # Training loss
             print('Training iteration:',i)
             
@@ -169,19 +176,33 @@ class standard_lstm(Model):
     def restore_model(self):
         self.load_weights(dir_path+'/checkpoints/my_checkpoint') # Load pretrained model
 
-    def regular_inference(self,rec_input_seq,rec_pred):
-        # Regular predict
-        for t in range(rec_pred.shape[0]):
-            rec_pred[t] = self.call(rec_input_seq).numpy()[0]
-            rec_input_seq[0,0:-1] = rec_input_seq[0,1:]
-            rec_input_seq[0,-1] = rec_pred[t]
+    def regular_inference(self,test_data):
+        # Test data has to be scaled already
+        test_total_size = np.shape(test_data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
+
+        # Non-recursive prediction
+        forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+        true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+
+        for t in range(test_total_size):
+            forecast_array[t] = self.call(test_data[t:t+self.seq_num].reshape(-1,self.seq_num,self.state_len))
+            true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
 
         # Rescale
-        rec_pred = self.preproc_pipeline.inverse_transform(rec_pred)
+        for lead_time in range(forecast_array.shape[1]):
+            forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
+            true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
 
-        return rec_pred
+        return forecast_array, true_array
 
-    def variational_inference(self,rec_input_seq,rec_pred):
+    def variational_inference(self,test_data):
+        # Test data has to be scaled already
+        test_total_size = np.shape(test_data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
+
+        # Non-recursive prediction
+        forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+        true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+
         # Load mask
         test_fields = np.load('Testing_snapshots.npy').T
         train_fields = np.load('Training_snapshots.npy').T
@@ -208,15 +229,20 @@ class standard_lstm(Model):
 
         true_observations = test_fields[:,rand_idx]
 
+        # Non-recursive prediction
+        forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+        true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+
         # 3D-Variational update
-        for t in range(500):
+        for t in range(10):
 
             # Background vector - initial time window input
-            x_ti = self.preproc_pipeline.inverse_transform(rec_input_seq[0,:].reshape(self.seq_num,-1))
+            x_input = test_data[t:t+self.seq_num].reshape(self.seq_num,self.state_len)
+            x_ti = self.preproc_pipeline.inverse_transform(x_input)
             x_ti_rec = np.matmul(pod_modes,x_ti.T)#[:,0:1]
 
             # Observation
-            y_ = true_observations[t+self.seq_num]
+            y_ = true_observations[t+self.seq_num:t+self.seq_num+self.seq_num_op]
 
             # Perform optimization assuming identity covariances
             # Define residual
@@ -228,11 +254,11 @@ class standard_lstm(Model):
 
                 # Likelihood
                 x = x.reshape(1,self.seq_num,-1)
-                x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(1,-1))
+                x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
                 x_tf_rec = np.matmul(pod_modes,x_tf.T)
 
                 # Sensor predictions
-                h_ = x_tf_rec[rand_idx,0]
+                h_ = x_tf_rec[rand_idx,:].T
 
                 # J
                 pred = (np.sum(0.5*(x_star_rec - x_ti_rec)**2)) + (np.sum(0.5*(y_-h_)**2))
@@ -261,16 +287,18 @@ class standard_lstm(Model):
 
                     x = tf.reshape(x,shape=[1,self.seq_num,-1])
 
-                    op = self.call(x)
+                    op = self.call(x)[0]
+
                     op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
                     op = (op)*std_scaler.scale_ + std_scaler.mean_
                     op = tf.cast(op,dtype='float64')
 
-                    x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))[:,0]
+                    x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
+
 
                     # Sensor predictions
                     tf_idx = tf.convert_to_tensor(rand_idx,dtype='int32')
-                    h_ = tf.gather(x_tf_rec,tf_idx)
+                    h_ = tf.transpose(tf.gather(x_tf_rec,tf_idx))
 
                     # J
                     pred = (tf.math.reduce_sum(0.5*(tf_x_star_rec - tf_x_ti_rec)**2)) + \
@@ -282,34 +310,36 @@ class standard_lstm(Model):
                  
                 return grad
 
-            solution = minimize(residual,rec_input_seq[0].flatten(), jac=residual_gradient, method='SLSQP',
-                tol=1e-8,options={'disp': True, 'maxiter': 100, 'eps': 1.4901161193847656e-8})
+            solution = minimize(residual,x_input.flatten(), jac=residual_gradient, method='SLSQP',
+                tol=1e-8,options={'disp': True, 'maxiter': 200, 'eps': 1.4901161193847656e-8})
 
-            old_of = residual(rec_input_seq[0].flatten())
+            old_of = residual(x_input.flatten())
             new_of = residual(solution.x)
 
             print('Initial guess residual:',old_of, ', Final guess residual:',new_of)
 
             if new_of< old_of:
+                
                 assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
-                rec_pred[t] = self.call(assimilated_rec_input_seq).numpy()[0].reshape(1,-1)
+                forecast_array[t] = self.call(assimilated_rec_input_seq).numpy()[0]
 
-                rec_input_seq[0,0:-1,:] = assimilated_rec_input_seq[0,1:,:]
-                rec_input_seq[0,-1,:] = rec_pred[t]
             else:
 
                 print('Optimization failed. Initial guess residual:',old_of, ', Final guess residual:',new_of)
 
-                rec_pred[t] = self.call(rec_input_seq).numpy()[0].reshape(1,-1)
-
-                rec_input_seq[0,0:-1,:] = rec_input_seq[0,1:,:]
-                rec_input_seq[0,-1,:] = rec_pred[t]
-
+                x_input = x_input.reshape(1,self.seq_num,-1)
+                forecast_array[t] = self.call(x_input).numpy()[0]
+            
+            true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            
             print('Finished variational prediction for timestep: ',t)
 
-        rec_pred = self.preproc_pipeline.inverse_transform(rec_pred)
+        # Rescale
+        for lead_time in range(forecast_array.shape[1]):
+            forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
+            true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
 
-        return rec_pred
+        return forecast_array, true_array
 
     # Do some testing
     def model_inference(self,test_data):
@@ -319,48 +349,30 @@ class standard_lstm(Model):
         # Scale testing data
         test_data = self.preproc_pipeline.transform(test_data)
 
-        # Test sizes
-        test_total_size = np.shape(test_data)[0]-int(self.seq_num) # Limit of sampling
-
-        # Initial condition setup
-        rec_input_seq = test_data[:self.seq_num,:].reshape(1,self.seq_num,self.state_len)
-        
-        # True outputs
-        rec_output_seq = np.zeros(shape=(test_total_size,self.state_len)) #[samples,n_outputs,state_len]
-        snum = 0
-        for t in range(test_total_size):
-            rec_output_seq[snum,:] = test_data[None,t+self.seq_num,:]        
-            snum = snum + 1
-
-        # Prediction recursively
-        rec_pred = np.copy(rec_output_seq)
-
         if self.var:
-            rec_pred = self.variational_inference(rec_input_seq,rec_pred)
+            forecast, truth = self.variational_inference(test_data)
         else:
-            rec_pred = self.regular_inference(rec_input_seq,rec_pred)
-
-        rec_output_seq = self.preproc_pipeline.inverse_transform(rec_output_seq)
+            forecast, truth  = self.regular_inference(test_data)
 
         if self.var:
             folder_name = './Var/'
         else:
             folder_name = './Regular/'
 
-        np.save(folder_name+'True.npy',rec_output_seq)
-        np.save(folder_name+'Predicted.npy',rec_pred)
+        np.save(folder_name+'True.npy',truth)
+        np.save(folder_name+'Predicted.npy',forecast)
 
         # plot
         for i in range(self.state_len):
             plt.figure()
             plt.title('Mode '+str(i))
-            plt.plot(rec_pred[:,i],label='Predicted')
-            plt.plot(rec_output_seq[:,i],label='True')
+            plt.plot(forecast[:,-1,i],label='Predicted')
+            plt.plot(truth[:,-1,i],label='True')
             plt.legend()
             plt.savefig(folder_name+'Mode '+str(i)+'.png')
             plt.close()
 
-        return rec_output_seq, rec_pred
+        return truth, forecast
 
 
 if __name__ == '__main__':
