@@ -5,9 +5,11 @@ import os
 
 # Load mask
 mask = np.asarray(np.load('mask',allow_pickle=True).data,dtype='bool')[0].flatten()
-test_fields = np.load('test_fields.npy',allow_pickle=True).data.reshape(1487,-1)
+test_fields = np.load('Testing_snapshots.npy',allow_pickle=True).data.reshape(1487,-1)
+snapshots_mean = np.load('Training_mean.npy')
+
 # Remove mean and land points
-test_fields = test_fields - np.mean(test_fields,axis=0)
+test_fields = test_fields - snapshots_mean[:,None]
 test_fields = test_fields[:500,mask]
 # Load POD modes
 pod_modes = np.load('POD_Modes.npy')

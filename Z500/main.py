@@ -13,7 +13,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Loading data
-    data = np.load('Training_Coefficients.npy').T
+    data = np.load('Train_Coefficients.npy')[:20,:].T
+
     # Initialize model
     lstm_model = standard_lstm(data,var=args.var)
     # Training model
@@ -21,6 +22,6 @@ if __name__ == '__main__':
         lstm_model.train_model() # Train and exit
     
     elif args.test:
-        data = np.load('Testing_Coefficients.npy').T
+        data = np.load('Test_Coefficients.npy')[:20,:].T
         true, predicted = lstm_model.model_inference(data) # Do some inference
 

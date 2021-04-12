@@ -20,6 +20,10 @@ import matplotlib.pyplot as plt
 # 3D Var
 from scipy.optimize import minimize
 
+# Input output
+num_ips = 7
+num_ops = 5
+
 #Build the model which does basic map of inputs to coefficients
 class standard_lstm(Model):
     def __init__(self,data,var=False):
@@ -33,12 +37,12 @@ class standard_lstm(Model):
         self.data_tsteps = np.shape(data)[0]
         self.state_len = np.shape(data)[1]
 
-        self.preproc_pipeline = Pipeline([('stdscaler', StandardScaler()),('minmax', MinMaxScaler(feature_range=(-1, 1)))])
+        self.preproc_pipeline = Pipeline([('minmaxscaler', MinMaxScaler())])
         self.data = self.preproc_pipeline.fit_transform(data)
 
         # Need to make minibatches
-        self.seq_num = 7
-        self.seq_num_op = 14
+        self.seq_num = num_ips
+        self.seq_num_op = num_ops
         self.total_size = np.shape(data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
 
         input_seq = np.zeros(shape=(self.total_size,self.seq_num,self.state_len))  #[samples,n_inputs,state_len]
@@ -74,14 +78,18 @@ class standard_lstm(Model):
 
         # Define architecture
         xavier=tf.keras.initializers.GlorotUniform()
+
         self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len))
-        # self.l1_transpose = tf.transpose(perm=[0,2,1])
         self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
-        # self.l2_transpose = tf.transpose(perm=[0,2,1])
         self.l2=tf.keras.layers.LSTM(50,return_sequences=True)
         self.out = tf.keras.layers.Dense(self.state_len)
         self.train_op = tf.keras.optimizers.Adam(learning_rate=0.001)
 
+        # # Prioritize according to scaled singular values
+        # self.singular_values = np.load('Singular_Values.npy')[:self.state_len]
+        # self.singular_values = self.singular_values/self.singular_values[0]
+
+        # self.singular_values[:] = 1.0
 
     # Running the model
     def call(self,X):
@@ -91,12 +99,20 @@ class standard_lstm(Model):
         h4 = tf.transpose(h3,perm=[0,2,1])
         h5 = self.l2(h4)
         out = self.out(h5)
+
         return out
     
     # Regular MSE
     def get_loss(self,X,Y):
         op=self.call(X)
-        return tf.reduce_mean(tf.math.square(op-Y))
+
+        temp = tf.reduce_mean(tf.math.square(op-Y),axis=0)
+        temp = tf.reduce_mean(temp,0)
+        temp = tf.reduce_mean(temp)
+
+        temp = temp + tf.reduce_sum(self.losses)
+
+        return temp
 
     # get gradients - regular
     def get_grad(self,X,Y):
@@ -122,7 +138,7 @@ class standard_lstm(Model):
         self.train_batch_size = int(self.ntrain/self.num_batches)
         self.valid_batch_size = int((self.nvalid)/self.num_batches)
         
-        for i in range(200):
+        for i in range(400):
             # Training loss
             print('Training iteration:',i)
             
@@ -211,9 +227,9 @@ class standard_lstm(Model):
         mean_val, var_val, min_val, max_val = np.mean(train_fields), np.var(train_fields), np.min(train_fields), np.max(train_fields)
 
         # Load POD modes
-        pod_modes = np.load('POD_Modes.npy')[:,:5]
+        pod_modes = np.load('Modes.npy')[:,:20]
         # Load mean
-        pod_mean = np.load('Training_mean.npy')
+        pod_mean = np.load('Mean.npy')
 
         # Remove mean
         test_fields = test_fields - pod_mean[None,:]
@@ -234,7 +250,7 @@ class standard_lstm(Model):
         true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
 
         # 3D-Variational update
-        for t in range(10):
+        for t in range(200):
 
             # Background vector - initial time window input
             x_input = test_data[t:t+self.seq_num].reshape(self.seq_num,self.state_len)
@@ -279,8 +295,12 @@ class standard_lstm(Model):
                 x = tf.convert_to_tensor(x,dtype='float64')
                 tf_pod_modes = tf.convert_to_tensor(pod_modes,dtype='float64')
 
-                std_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
-                minmax_scaler = self.preproc_pipeline.get_params()['steps'][1][1]
+                # For both minmax, stdscaler
+                # std_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
+                # minmax_scaler = self.preproc_pipeline.get_params()['steps'][1][1]
+
+                minmax_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
+
 
                 with tf.GradientTape(persistent=True) as t:
                     t.watch(x)
@@ -289,8 +309,11 @@ class standard_lstm(Model):
 
                     op = self.call(x)[0]
 
+                    # For both minmax, stdscaler
+                    # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                    # op = (op)*std_scaler.scale_ + std_scaler.mean_
+
                     op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                    op = (op)*std_scaler.scale_ + std_scaler.mean_
                     op = tf.cast(op,dtype='float64')
 
                     x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
