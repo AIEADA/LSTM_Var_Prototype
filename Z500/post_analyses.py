@@ -29,21 +29,3 @@ predicted = snapshots_mean[:,:,None] + np.matmul(pod_modes,pred_test.T).reshape(
 test_fields = test_fields[:,:,num_ips+lead_time:]
 
 plot_averaged_errors(test_fields,predicted,snapshots_mean)
-
-# pred_loc = 2500 #10, 2500, 1500 is good, 100, 150, 200, 3200 is meh
-
-# plt.figure()
-# plt.imshow(test_fields[:,:,pred_loc],vmin=4500,vmax=6000)
-# plt.colorbar()
-# plt.title('True')
-
-# plt.figure()
-# plt.imshow(true_pod[:,:,pred_loc],vmin=4500,vmax=6000)
-# plt.colorbar()
-# plt.title('Projected')
-
-# plt.figure()
-# plt.imshow(predicted[:,:,pred_loc],vmin=4500,vmax=6000)
-# plt.colorbar()
-# plt.title('Predicted')
-# plt.show()
