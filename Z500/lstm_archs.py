@@ -21,8 +21,8 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
 # Input output
-num_ips = 14
-num_ops = 7
+num_ips = 28
+num_ops = 56
 
 #Build the model which does basic map of inputs to coefficients
 class standard_lstm(Model):

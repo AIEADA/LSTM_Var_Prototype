@@ -90,12 +90,12 @@ def plot_averaged_errors(true_fields, pred_fields, snapshots_mean):
     plot_contours(mae_fields,'Mean absolute error')
     plot_contours(rmse_fields,'Root Mean squared error')
 
-    r_plot = correlation_plot(true_fields,pred_fields,int_start=0,int_end=3*365)
+    r_plot = correlation_plot(true_fields,pred_fields,int_start=0,int_end=10*365)
 
     true_fluc = true_fields - snapshots_mean[:,:,None]
     pred_fluc = pred_fields - snapshots_mean[:,:,None]
 
-    cos_plot = cosine_plot(true_fluc,pred_fluc,int_start=0,int_end=3*365)
+    cos_plot = cosine_plot(true_fluc,pred_fluc,int_start=0,int_end=10*365)
 
     plot_contours(r_plot,'Pearson R plot')
     plot_contours(cos_plot,'Cosine similarity plot')

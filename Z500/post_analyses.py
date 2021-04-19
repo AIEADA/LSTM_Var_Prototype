@@ -25,7 +25,11 @@ true_pod = snapshots_mean[:,:,None] + np.matmul(pod_modes,true_test.T).reshape(1
 predicted = snapshots_mean[:,:,None] + np.matmul(pod_modes,pred_test.T).reshape(103,120,-1)
 # var = snapshots_mean[:,:,None] + np.matmul(pod_modes,pred_var_test.T).reshape(103,120,-1)
 
+# persistence predictions
+persistence_fields = test_fields[:,:,num_ips:-lead_time]
+
 # Post analyses - unify time slices
 test_fields = test_fields[:,:,num_ips+lead_time:]
 
 plot_averaged_errors(test_fields,predicted,snapshots_mean)
+plot_averaged_errors(test_fields,persistence_fields,snapshots_mean)
