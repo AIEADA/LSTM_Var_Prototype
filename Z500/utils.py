@@ -49,14 +49,15 @@ def plot_contours(field,title='Figure'):
     plt.show()
 
 
-def cosine_plot(snapshots_true,snapshots_pred,int_start,int_end):
+def cosine_plot(snapshots_true,snapshots_pred):
     # dimensions
     dim1 = snapshots_pred.shape[0]
     dim2 = snapshots_pred.shape[1]
+    dim3 = snapshots_pred.shape[2]
 
     # Finding the cosine similarity
-    pred_vals = snapshots_pred[:,:,int_start:int_end].reshape(-1,int_end-int_start)
-    true_vals = snapshots_true[:,:,int_start:int_end].reshape(-1,int_end-int_start)
+    pred_vals = snapshots_pred.reshape(-1,dim3)
+    true_vals = snapshots_true.reshape(-1,dim3)
     
     # For the provided prediction
     pred_cos_vals = np.zeros(shape=(pred_vals.shape[0]))
@@ -66,14 +67,15 @@ def cosine_plot(snapshots_true,snapshots_pred,int_start,int_end):
             
     return pred_cos_vals.reshape(dim1,dim2)
     
-def correlation_plot(snapshots_true,snapshots_pred,int_start,int_end):
+def correlation_plot(snapshots_true,snapshots_pred):
     # dimensions
     dim1 = snapshots_pred.shape[0]
     dim2 = snapshots_pred.shape[1]
+    dim3 = snapshots_pred.shape[2]
 
     # Finding the Pearson correlation (without time lag)    
-    pred_vals = snapshots_pred[:,:,int_start:int_end].reshape(-1,int_end-int_start)
-    true_vals = snapshots_true[:,:,int_start:int_end].reshape(-1,int_end-int_start)
+    pred_vals = snapshots_pred[:,:].reshape(-1,dim3)
+    true_vals = snapshots_true[:,:].reshape(-1,dim3)
     
     # For the provided prediction
     pred_r_vals = np.zeros(shape=(pred_vals.shape[0]))
@@ -90,17 +92,42 @@ def plot_averaged_errors(true_fields, pred_fields, snapshots_mean):
     plot_contours(mae_fields,'Mean absolute error')
     plot_contours(rmse_fields,'Root Mean squared error')
 
-    r_plot = correlation_plot(true_fields,pred_fields,int_start=0,int_end=10*365)
+    r_plot = correlation_plot(true_fields,pred_fields)
 
     true_fluc = true_fields - snapshots_mean[:,:,None]
     pred_fluc = pred_fields - snapshots_mean[:,:,None]
 
-    cos_plot = cosine_plot(true_fluc,pred_fluc,int_start=0,int_end=10*365)
+    cos_plot = cosine_plot(true_fluc,pred_fluc)
 
     plot_contours(r_plot,'Pearson R plot')
     plot_contours(cos_plot,'Cosine similarity plot')
 
-    
+def plot_windowed_errors(true_fields, pred_fields, snapshots_mean, int_start=0,int_end=30):
+    num_years = int(true_fields.shape[-1]/365)
+
+    true_windowed = true_fields[:,:,int_start:int_start+int_end]
+    pred_windowed = pred_fields[:,:,int_start:int_start+int_end]
+
+    for year in range(1,num_years):
+        true_windowed = np.concatenate((true_windowed,true_fields[:,:,year*365+int_start:year*365+int_start+int_end]),axis=-1)
+        pred_windowed = np.concatenate((pred_windowed,pred_fields[:,:,year*365+int_start:year*365+int_start+int_end]),axis=-1)
+
+    mae_fields = np.mean(np.abs(pred_windowed - true_windowed),axis=-1)
+    rmse_fields = np.sqrt(np.mean((pred_windowed - true_windowed)**2,axis=-1))
+
+    plot_contours(mae_fields,'Mean absolute error')
+    plot_contours(rmse_fields,'Root Mean squared error')
+
+    r_plot = correlation_plot(true_windowed,pred_windowed)
+
+    true_fluc = true_windowed - snapshots_mean[:,:,None]
+    pred_fluc = pred_windowed - snapshots_mean[:,:,None]
+
+    cos_plot = cosine_plot(true_fluc,pred_fluc)
+
+    plot_contours(r_plot,'Pearson R plot')
+    plot_contours(cos_plot,'Cosine similarity plot')
+
 
 if __name__ == '__main__':
     print('This is the utilities file')
