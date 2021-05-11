@@ -31,10 +31,10 @@ persistence_fields = test_fields[:,:,num_ips:-lead_time]
 # Post analyses - unify time slices
 test_fields = test_fields[:,:,num_ips+lead_time:]
 
-# # For all time steps
-# plot_averaged_errors(test_fields,predicted,snapshots_mean)
+# For all time steps
+plot_averaged_errors(test_fields,predicted,snapshots_mean)
 # plot_averaged_errors(test_fields,persistence_fields,snapshots_mean)
 
-# For the first 60 days of each year in testing
-plot_windowed_errors(test_fields,predicted,snapshots_mean,int_start=120,int_end=150)
-plot_windowed_errors(test_fields,persistence_fields,snapshots_mean,int_start=120,int_end=150)
+# For the specific days
+# plot_windowed_errors(test_fields,predicted,snapshots_mean,int_start=120,int_end=150)
+# plot_windowed_errors(test_fields,persistence_fields,snapshots_mean,int_start=120,int_end=150)

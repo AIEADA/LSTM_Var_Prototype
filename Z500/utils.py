@@ -18,7 +18,7 @@ def coeff_determination(y_pred, y_true): #Order of function inputs is important 
     SS_tot = np.sum(np.square( y_true - np.mean(y_true) ) )
     return ( 1 - SS_res/(SS_tot + 2.22044604925e-16) )
 
-def plot_contours(field,title='Figure'):
+def plot_contours(field,crange_min,crange_max,title='Figure'):
     lon = np.load('./xlong.npy')
     lat = np.load('./xlat.npy')
 
@@ -38,6 +38,7 @@ def plot_contours(field,title='Figure'):
 
     mycmap=cmaps.MPL_jet  
     rr = ax.pcolormesh(lon[0:102,5:119], lat[0:102,5:119], field[0:102,5:119],shading='auto',cmap=mycmap)#,norm=mynorm)  #gist_stern afmhot didn't use transform, but looks ok...
+    rr.set_clim(crange_min,crange_max)
 
     cbar = plt.colorbar(rr, orientation='horizontal', pad=.1,shrink=1, aspect=28,extend='max')#,ticks=[250,255,260,265,270,275,280,285,290,295]) #,,,ticks=[-5,-4,-3,-2,-1,0,1,2,3,4,5]ticks=[0,5,10,15,20]label='number of days'),ticks=[0,.1,.2,.3,.4,.5,.6]
     cbar.set_label(label=title, fontsize=16)
@@ -46,6 +47,7 @@ def plot_contours(field,title='Figure'):
     ax.add_feature(cfeature.NaturalEarthFeature('physical', 'lakes', '50m', edgecolor='0.6', facecolor='white'))
     plt.xticks(fontsize=18)
     plt.yticks(fontsize=18)
+    plt.title(title)
     plt.show()
 
 
@@ -89,18 +91,20 @@ def plot_averaged_errors(true_fields, pred_fields, snapshots_mean):
     mae_fields = np.mean(np.abs(pred_fields - true_fields),axis=-1)
     rmse_fields = np.sqrt(np.mean((pred_fields - true_fields)**2,axis=-1))
 
-    plot_contours(mae_fields,'Mean absolute error')
-    plot_contours(rmse_fields,'Root Mean squared error')
-
-    r_plot = correlation_plot(true_fields,pred_fields)
+    plot_contours(mae_fields,0,150,'Mean absolute error')
+    # plot_contours(rmse_fields,0,130,'Root Mean squared error')
 
     true_fluc = true_fields - snapshots_mean[:,:,None]
     pred_fluc = pred_fields - snapshots_mean[:,:,None]
 
+    fluc_error = np.mean((pred_fluc - true_fluc),axis=-1)
+    r_plot = correlation_plot(true_fluc,pred_fluc)
     cos_plot = cosine_plot(true_fluc,pred_fluc)
 
-    plot_contours(r_plot,'Pearson R plot')
-    plot_contours(cos_plot,'Cosine similarity plot')
+    plot_contours(fluc_error,-20,20,'Mean fluctuation error')
+    # plot_contours(r_plot,0,1,'Pearson R plot')
+    plot_contours(cos_plot,0,1,'Cosine similarity plot')
+
 
 def plot_windowed_errors(true_fields, pred_fields, snapshots_mean, int_start=0,int_end=30):
     num_years = int(true_fields.shape[-1]/365)
@@ -115,18 +119,19 @@ def plot_windowed_errors(true_fields, pred_fields, snapshots_mean, int_start=0,i
     mae_fields = np.mean(np.abs(pred_windowed - true_windowed),axis=-1)
     rmse_fields = np.sqrt(np.mean((pred_windowed - true_windowed)**2,axis=-1))
 
-    plot_contours(mae_fields,'Mean absolute error')
-    plot_contours(rmse_fields,'Root Mean squared error')
-
-    r_plot = correlation_plot(true_windowed,pred_windowed)
+    plot_contours(mae_fields,0,150,'Mean absolute error')
+    # plot_contours(rmse_fields,0,130,'Root Mean squared error')
 
     true_fluc = true_windowed - snapshots_mean[:,:,None]
     pred_fluc = pred_windowed - snapshots_mean[:,:,None]
-
+    
+    fluc_error = np.mean((pred_fluc - true_fluc),axis=-1)
+    r_plot = correlation_plot(true_fluc,pred_fluc)
     cos_plot = cosine_plot(true_fluc,pred_fluc)
 
-    plot_contours(r_plot,'Pearson R plot')
-    plot_contours(cos_plot,'Cosine similarity plot')
+    plot_contours(fluc_error,-30,30,'Mean fluctuation error')
+    # plot_contours(r_plot,0,1,'Pearson R plot')
+    plot_contours(cos_plot,0,1,'Cosine similarity plot')
 
 
 if __name__ == '__main__':
