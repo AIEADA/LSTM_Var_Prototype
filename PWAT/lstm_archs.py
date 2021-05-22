@@ -227,9 +227,9 @@ class standard_lstm(Model):
         mean_val, var_val, min_val, max_val = np.mean(train_fields), np.var(train_fields), np.min(train_fields), np.max(train_fields)
 
         # Load POD modes
-        pod_modes = np.load('Modes.npy')[:,:20]
+        pod_modes = np.load('POD_Modes.npy')[:,:20]
         # Load mean
-        pod_mean = np.load('Mean.npy')
+        pod_mean = np.load('Training_mean.npy')
 
         # Remove mean
         test_fields = test_fields - pod_mean[None,:]

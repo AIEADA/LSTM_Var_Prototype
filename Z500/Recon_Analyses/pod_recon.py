@@ -49,9 +49,12 @@ if __name__ == '__main__':
     cf_truncs_test = np.load('Test_Coefficients.npy')
     mean_value = np.load('Mean.npy')
 
-    num_modes = 20
+    num_modes = 5
     reconstruction = mean_value[:,None] + np.matmul(pod_modes[:,:num_modes],cf_truncs_test[:num_modes,:])
     reconstruction = reconstruction.reshape(103,120,-1)
+
+    np.save('reconstruction.npy',reconstruction)
+    exit()
 
     testing_snapshots = testing_snapshots.reshape(103,120,-1)
 
