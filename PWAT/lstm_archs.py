@@ -250,7 +250,8 @@ class standard_lstm(Model):
         true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
 
         # 3D-Variational update
-        for t in range(200):
+        var_time = 200
+        for t in range(var_time):
 
             # Background vector - initial time window input
             x_input = test_data[t:t+self.seq_num].reshape(self.seq_num,self.state_len)
@@ -334,7 +335,7 @@ class standard_lstm(Model):
                 return grad
 
             solution = minimize(residual,x_input.flatten(), jac=residual_gradient, method='SLSQP',
-                tol=1e-8,options={'disp': True, 'maxiter': 200, 'eps': 1.4901161193847656e-8})
+                tol=1e-2,options={'disp': True, 'maxiter': 20, 'eps': 1.4901161193847656e-8})
 
             old_of = residual(x_input.flatten())
             new_of = residual(solution.x)
