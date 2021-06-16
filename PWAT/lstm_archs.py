@@ -26,11 +26,13 @@ num_ops = 7
 
 #Build the model which does basic map of inputs to coefficients
 class standard_lstm(Model):
-    def __init__(self,data,var=False):
+    def __init__(self,data,flags):
         super(standard_lstm, self).__init__()
 
         # Inference with 3D var?
-        self.var = var
+        self.var = flags[0]
+        # Use Era5 for Var?
+        self.era5 = flags[1]
         self.num_obs = 5000
 
         # Set up the data for the LSTM
@@ -220,7 +222,11 @@ class standard_lstm(Model):
         true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
 
         # Load mask
-        test_fields = np.load('Testing_snapshots.npy').T
+        if self.era5:
+            test_fields = np.load('ERA5_Testing_snapshots.npy').T
+        else:
+            test_fields = np.load('Testing_snapshots.npy').T
+        
         train_fields = np.load('Training_snapshots.npy').T
 
         # Get fixed min/max here
@@ -335,7 +341,7 @@ class standard_lstm(Model):
                 return grad
 
             solution = minimize(residual,x_input.flatten(), jac=residual_gradient, method='SLSQP',
-                tol=1e-2,options={'disp': True, 'maxiter': 20, 'eps': 1.4901161193847656e-8})
+                tol=1e-3,options={'disp': True, 'maxiter': 20, 'eps': 1.4901161193847656e-8})
 
             old_of = residual(x_input.flatten())
             new_of = residual(solution.x)

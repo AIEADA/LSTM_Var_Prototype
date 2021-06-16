@@ -7,8 +7,13 @@ from utils import plot_averaged_errors, plot_windowed_errors
 
 lead_time = num_ops
 var_time = 200
+era5 = True
 
-test_fields = np.load('Testing_snapshots.npy').reshape(103,120,-1)[:,:,:var_time+num_ips+num_ops]
+if era5:
+    test_fields = np.load('ERA5_Testing_snapshots.npy').reshape(103,120,-1)[:,:,:var_time+num_ips+num_ops]
+else:
+    test_fields = np.load('Testing_snapshots.npy').reshape(103,120,-1)[:,:,:var_time+num_ips+num_ops]
+
 snapshots_mean = np.load('Training_mean.npy').reshape(103,120)
 
 # Load POD modes
