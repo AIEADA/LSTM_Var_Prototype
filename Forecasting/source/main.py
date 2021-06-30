@@ -1,4 +1,4 @@
-import os, yaml, sys
+import os, yaml, sys, shutil
 current_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(current_dir)
 
@@ -16,6 +16,8 @@ config_file.close()
 # Location for test results
 if not os.path.exists(data_paths['save_path']):
     os.makedirs(data_paths['save_path'])
+    # Save the configuration file for reference
+    shutil.copyfile('config.yaml',data_paths['save_path']+'config.yaml')
 
 if __name__ == '__main__':
 
@@ -24,7 +26,8 @@ if __name__ == '__main__':
     from lstm_archs import standard_lstm
 
     # Loading data
-    train_data = np.load(data_paths['training_coefficients']).T
+    num_modes = hyperparameters[6]
+    train_data = np.load(data_paths['training_coefficients']).T[:,:num_modes]
 
     # Initialize model
     lstm_model = standard_lstm(train_data,data_paths['save_path'],hyperparameters)
@@ -36,7 +39,7 @@ if __name__ == '__main__':
     # Regular testing of model
     if operation_mode['test']:
         
-        test_data = np.load(data_paths['testing_coefficients']).T
+        test_data = np.load(data_paths['testing_coefficients']).T[:,:num_modes]
         true, forecast = lstm_model.regular_inference(test_data)
 
         if not os.path.exists(data_paths['save_path']+'/Regular/'):
@@ -47,10 +50,10 @@ if __name__ == '__main__':
     # 3DVar testing of model
     if operation_mode['perform_var']:
         
-        test_data = np.load(data_paths['testing_coefficients']).T
+        test_data = np.load(data_paths['testing_coefficients']).T[:,:num_modes]
         train_fields = np.load(data_paths['training_fields']).T
         test_fields = np.load(data_paths['da_testing_fields']).T
-        pod_modes = np.load(data_paths['pod_modes'])[:,:20]
+        pod_modes = np.load(data_paths['pod_modes'])[:,:num_modes]
         training_mean = np.load(data_paths['training_mean'])
 
         true, forecast = lstm_model.variational_inference(test_data,train_fields,test_fields,pod_modes,training_mean)
@@ -65,7 +68,7 @@ if __name__ == '__main__':
 
         from post_analyses import perform_analyses
        
-        pod_modes = np.load(data_paths['pod_modes'])[:,:20]
+        pod_modes = np.load(data_paths['pod_modes'])[:,:num_modes]
         training_mean = np.load(data_paths['training_mean'])
 
         var_time = hyperparameters[0]
