@@ -1,3 +1,4 @@
 *.npy
 *.nc
-checkpoints/
+*.nc.d
+*.png
