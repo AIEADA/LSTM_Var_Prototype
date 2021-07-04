@@ -242,6 +242,78 @@ class standard_lstm(Model):
         forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
         true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
 
+        # Define residual
+        x_ti_rec = None; y_ = None
+        def residual(x):
+            # Prior
+            x = x.reshape(self.seq_num,-1)
+            xphys = self.preproc_pipeline.inverse_transform(x)
+            x_star_rec = np.matmul(pod_modes,xphys.T)#[:,0:1]
+
+            # Likelihood
+            x = x.reshape(1,self.seq_num,-1)
+            x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+            x_tf_rec = np.matmul(pod_modes,x_tf.T)
+
+            # Sensor predictions
+            h_ = x_tf_rec[rand_idx,:].T
+
+            # J
+            pred = (np.sum(0.5*(x_star_rec - x_ti_rec)**2)) + (np.sum(0.5*(y_-h_)**2))
+            
+            return (pred-min_val)/(5000*(max_val-min_val))
+
+        # Define gradient of residual
+        def residual_gradient(x):
+            # Prior
+            x = x.reshape(self.seq_num,-1).astype('double')
+            xphys = self.preproc_pipeline.inverse_transform(x)
+            tf_x_star_rec = tf.convert_to_tensor(np.matmul(pod_modes,xphys.T),dtype='float64')#[:,0:1]
+            tf_x_ti_rec = tf.convert_to_tensor(x_ti_rec,dtype='float64')
+            tf_y_ = tf.convert_to_tensor(y_,dtype='float64')
+
+            # Likelihood
+            x = x.reshape(1,-1)
+            x = tf.convert_to_tensor(x,dtype='float64')
+            tf_pod_modes = tf.convert_to_tensor(pod_modes,dtype='float64')
+
+            # For both minmax, stdscaler
+            # std_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
+            # minmax_scaler = self.preproc_pipeline.get_params()['steps'][1][1]
+
+            minmax_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
+
+            with tf.GradientTape(persistent=True) as t:
+                t.watch(x)
+
+                x = tf.reshape(x,shape=[1,self.seq_num,-1])
+
+                op = self.call(x)[0]
+
+                # For both minmax, stdscaler
+                # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                # op = (op)*std_scaler.scale_ + std_scaler.mean_
+
+                op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                op = tf.cast(op,dtype='float64')
+
+                x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
+
+
+                # Sensor predictions
+                tf_idx = tf.convert_to_tensor(rand_idx,dtype='int32')
+                h_ = tf.transpose(tf.gather(x_tf_rec,tf_idx))
+
+                # J
+                pred = (tf.math.reduce_sum(0.5*(tf_x_star_rec - tf_x_ti_rec)**2)) + \
+                        (tf.math.reduce_sum(0.5*(tf_y_-h_)**2))
+
+                pred = (pred-min_val)/(5000*(max_val-min_val))
+
+            grad = t.gradient(pred, x).numpy()[0,:,:].flatten().astype('double')
+             
+            return grad
+
         # 3D-Variational update
         var_time = self.var_duration
         for t in range(var_time):
@@ -254,79 +326,7 @@ class standard_lstm(Model):
             # Observation
             y_ = true_observations[t+self.seq_num:t+self.seq_num+self.seq_num_op]
 
-            # Perform optimization assuming identity covariances
-            # Define residual
-            def residual(x):
-                # Prior
-                x = x.reshape(self.seq_num,-1)
-                xphys = self.preproc_pipeline.inverse_transform(x)
-                x_star_rec = np.matmul(pod_modes,xphys.T)#[:,0:1]
-
-                # Likelihood
-                x = x.reshape(1,self.seq_num,-1)
-                x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
-                x_tf_rec = np.matmul(pod_modes,x_tf.T)
-
-                # Sensor predictions
-                h_ = x_tf_rec[rand_idx,:].T
-
-                # J
-                pred = (np.sum(0.5*(x_star_rec - x_ti_rec)**2)) + (np.sum(0.5*(y_-h_)**2))
-                
-                return (pred-min_val)/(5000*(max_val-min_val))
-
-            # Define gradient of residual
-            def residual_gradient(x):
-                # Prior
-                x = x.reshape(self.seq_num,-1).astype('double')
-                xphys = self.preproc_pipeline.inverse_transform(x)
-                tf_x_star_rec = tf.convert_to_tensor(np.matmul(pod_modes,xphys.T),dtype='float64')#[:,0:1]
-                tf_x_ti_rec = tf.convert_to_tensor(x_ti_rec,dtype='float64')
-                tf_y_ = tf.convert_to_tensor(y_,dtype='float64')
-
-                # Likelihood
-                x = x.reshape(1,-1)
-                x = tf.convert_to_tensor(x,dtype='float64')
-                tf_pod_modes = tf.convert_to_tensor(pod_modes,dtype='float64')
-
-                # For both minmax, stdscaler
-                # std_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
-                # minmax_scaler = self.preproc_pipeline.get_params()['steps'][1][1]
-
-                minmax_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
-
-
-                with tf.GradientTape(persistent=True) as t:
-                    t.watch(x)
-
-                    x = tf.reshape(x,shape=[1,self.seq_num,-1])
-
-                    op = self.call(x)[0]
-
-                    # For both minmax, stdscaler
-                    # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                    # op = (op)*std_scaler.scale_ + std_scaler.mean_
-
-                    op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                    op = tf.cast(op,dtype='float64')
-
-                    x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
-
-
-                    # Sensor predictions
-                    tf_idx = tf.convert_to_tensor(rand_idx,dtype='int32')
-                    h_ = tf.transpose(tf.gather(x_tf_rec,tf_idx))
-
-                    # J
-                    pred = (tf.math.reduce_sum(0.5*(tf_x_star_rec - tf_x_ti_rec)**2)) + \
-                            (tf.math.reduce_sum(0.5*(tf_y_-h_)**2))
-
-                    pred = (pred-min_val)/(5000*(max_val-min_val))
-
-                grad = t.gradient(pred, x).numpy()[0,:,:].flatten().astype('double')
-                 
-                return grad
-
+            # Perform optimization
             solution = minimize(residual,x_input.flatten(), jac=residual_gradient, method='SLSQP',
                 tol=1e-3,options={'disp': True, 'maxiter': 20, 'eps': 1.4901161193847656e-8})
 
@@ -339,6 +339,177 @@ class standard_lstm(Model):
                 
                 assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
                 forecast_array[t] = self.call(assimilated_rec_input_seq).numpy()[0]
+
+            else:
+
+                print('Optimization failed. Initial guess residual:',old_of, ', Final guess residual:',new_of)
+
+                x_input = x_input.reshape(1,self.seq_num,-1)
+                forecast_array[t] = self.call(x_input).numpy()[0]
+            
+            true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            
+            print('Finished variational prediction for timestep: ',t)
+
+
+        return true_array, forecast_array
+
+    def constrained_variational_inference(self,test_data,train_fields,test_fields,pod_modes,training_mean,num_fixed_modes):
+        # Restore from checkpoint
+        self.restore_model()
+
+        # Scale testing data
+        test_data = self.preproc_pipeline.transform(test_data)
+
+        # Test data has to be scaled already
+        test_total_size = np.shape(test_data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
+
+        # Non-recursive prediction
+        forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+        true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+
+        # Get fixed min/max here
+        mean_val, var_val, min_val, max_val = np.mean(train_fields), np.var(train_fields), np.min(train_fields), np.max(train_fields)
+
+        # Remove mean
+        test_fields = test_fields - training_mean[None,:]
+        
+        # Random observation locations
+        rand_idx = np.arange(test_fields.shape[1])
+        np.random.shuffle(rand_idx)
+        rand_idx = rand_idx[:self.num_obs]
+
+        num_grid_points = test_fields.shape[0]
+        num_observations = rand_idx.shape[0]
+        total_dof = num_grid_points + num_observations
+
+        true_observations = test_fields[:,rand_idx]
+
+        # Non-recursive prediction
+        forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+        true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+
+        # # Fixed modes
+        # all_modes = np.arange(pod_modes.shape[1])
+        # variable_modes = np.asarray(variable_modes)
+        # fixed_modes = numpy.setxor1d(all_modes, variable_modes)
+
+        # Define residual
+        x_ti_rec = None; y_ = None; 
+        global x_fixed
+        x_fixed = None
+        # x_fixed = test_data[:self.seq_num,:num_fixed_modes]
+        def residual(x):
+            global x_fixed
+            # Prior
+            x_fixed = x_fixed.reshape(self.seq_num,-1)
+            x = x.reshape(self.seq_num,-1)
+            x = np.concatenate((x_fixed,x),axis=1)
+
+            xphys = self.preproc_pipeline.inverse_transform(x)
+            x_star_rec = np.matmul(pod_modes,xphys.T)#[:,0:1]
+
+            # Likelihood
+            x = x.reshape(1,self.seq_num,-1)
+            x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+            x_tf_rec = np.matmul(pod_modes,x_tf.T)
+
+            # Sensor predictions
+            h_ = x_tf_rec[rand_idx,:].T
+
+            # J
+            pred = (np.sum(0.5*(x_star_rec - x_ti_rec)**2)) + (np.sum(0.5*(y_-h_)**2))
+            
+            return (pred-min_val)/(5000*(max_val-min_val))
+
+        # Define gradient of residual
+        def residual_gradient(x_var):
+            global x_fixed
+            x_var = x_var.reshape(self.seq_num,-1)
+            x = np.concatenate((x_fixed,x_var),axis=1)
+
+            xphys = self.preproc_pipeline.inverse_transform(x)
+            tf_x_star_rec = tf.convert_to_tensor(np.matmul(pod_modes,xphys.T),dtype='float64')#[:,0:1]
+            tf_x_ti_rec = tf.convert_to_tensor(x_ti_rec,dtype='float64')
+            tf_y_ = tf.convert_to_tensor(y_,dtype='float64')
+
+            # Likelihood
+            # x = x.reshape(1,-1)
+            # x = tf.convert_to_tensor(x,dtype='float64')
+
+            x_var_tf = x_var.reshape(1,-1)
+            x_var_tf = tf.convert_to_tensor(x_var_tf,dtype='float64')
+
+            x_fixed_tf = x_fixed.reshape(1,-1)
+            x_fixed_tf = tf.convert_to_tensor(x_fixed_tf,dtype='float64')
+            tf_pod_modes = tf.convert_to_tensor(pod_modes,dtype='float64')
+
+            # For both minmax, stdscaler
+            # std_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
+            # minmax_scaler = self.preproc_pipeline.get_params()['steps'][1][1]
+
+            minmax_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
+
+            with tf.GradientTape(persistent=True) as t:
+                t.watch(x_var_tf)
+
+                x = tf.concat([x_fixed_tf,x_var_tf],axis=1)
+                x = tf.reshape(x,shape=[1,self.seq_num,-1])
+                op = self.call(x)[0]
+
+                # For both minmax, stdscaler
+                # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                # op = (op)*std_scaler.scale_ + std_scaler.mean_
+
+                op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                op = tf.cast(op,dtype='float64')
+
+                x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
+
+
+                # Sensor predictions
+                tf_idx = tf.convert_to_tensor(rand_idx,dtype='int32')
+                h_ = tf.transpose(tf.gather(x_tf_rec,tf_idx))
+
+                # J
+                pred = (tf.math.reduce_sum(0.5*(tf_x_star_rec - tf_x_ti_rec)**2)) + \
+                        (tf.math.reduce_sum(0.5*(tf_y_-h_)**2))
+
+                pred = (pred-min_val)/(5000*(max_val-min_val))
+
+            grad = t.gradient(pred, x_var_tf).numpy().flatten().astype('double')
+             
+            return grad
+
+        # 3D-Variational update
+        var_time = self.var_duration
+        for t in range(var_time):
+
+            # Background vector - initial time window input
+            x_input = test_data[t:t+self.seq_num].reshape(self.seq_num,self.state_len)
+            
+            # Fix some scales
+            x_fixed = x_input[:,:num_fixed_modes]
+            x_var = x_input[:,num_fixed_modes:]
+
+            x_ti = self.preproc_pipeline.inverse_transform(x_input)
+            x_ti_rec = np.matmul(pod_modes,x_ti.T)#[:,0:1]
+
+            # Observation
+            y_ = true_observations[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+
+            # Perform optimization
+            solution = minimize(residual,x_var.flatten(), jac=residual_gradient, method='SLSQP',
+                tol=1e-3,options={'disp': True, 'maxiter': 20, 'eps': 1.4901161193847656e-8})
+
+            old_of = residual(x_var.flatten())
+            new_of = residual(solution.x)
+
+            print('Initial guess residual:',old_of, ', Final guess residual:',new_of)
+
+            if new_of< old_of:
+                x_solution = np.concatenate((x_fixed,solution.x_var),axis=1).reshape(1,self.seq_num,-1)
+                forecast_array[t] = self.call(x_solution).numpy()[0]
 
             else:
 
