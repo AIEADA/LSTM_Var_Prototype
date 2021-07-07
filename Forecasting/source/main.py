@@ -60,13 +60,19 @@ if __name__ == '__main__':
         if operation_mode['constrained_var']:
             num_fixed_modes = hyperparameters[7]
             true, forecast = lstm_model.constrained_variational_inference(test_data,train_fields,test_fields,pod_modes,training_mean,num_fixed_modes)
+
+            if not os.path.exists(data_paths['save_path']+'3DVar_Constrained/'):
+                os.makedirs(data_paths['save_path']+'3DVar_Constrained/')
+            np.save(data_paths['save_path']+'/3DVar_Constrained/True.npy',true)
+            np.save(data_paths['save_path']+'/3DVar_Constrained/Predicted.npy',forecast)
+
         else:
             true, forecast = lstm_model.variational_inference(test_data,train_fields,test_fields,pod_modes,training_mean)
 
-        if not os.path.exists(data_paths['save_path']+'3DVar/'):
-            os.makedirs(data_paths['save_path']+'3DVar/')
-        np.save(data_paths['save_path']+'/3DVar/True.npy',true)
-        np.save(data_paths['save_path']+'/3DVar/Predicted.npy',forecast)
+            if not os.path.exists(data_paths['save_path']+'3DVar/'):
+                os.makedirs(data_paths['save_path']+'3DVar/')
+            np.save(data_paths['save_path']+'/3DVar/True.npy',true)
+            np.save(data_paths['save_path']+'/3DVar/Predicted.npy',forecast)
 
 
     if operation_mode['perform_analyses']:
@@ -76,9 +82,9 @@ if __name__ == '__main__':
         pod_modes = np.load(data_paths['pod_modes'])[:,:num_modes]
         training_mean = np.load(data_paths['training_mean'])
 
-        var_time = hyperparameters[0]
         num_inputs = hyperparameters[1]
         num_outputs = hyperparameters[2]
+        var_time = hyperparameters[4]
 
         if os.path.isfile(data_paths['save_path']+'/Regular/Predicted.npy'):
             forecast = np.load(data_paths['save_path']+'/Regular/Predicted.npy')
@@ -97,4 +103,14 @@ if __name__ == '__main__':
                             data_paths['save_path']+'/3DVar/',subregion_paths)
         else:
             print('No forecast for the test data with 3D Var. Skipping analyses.')
+
+
+        if os.path.isfile(data_paths['save_path']+'/3DVar_Constrained/Predicted.npy'):
+            forecast = np.load(data_paths['save_path']+'/3DVar_Constrained/Predicted.npy')
+            test_fields = np.load(data_paths['da_testing_fields'])
+            perform_analyses(var_time,num_inputs,num_outputs,
+                            test_fields,training_mean,pod_modes,forecast,
+                            data_paths['save_path']+'/3DVar_Constrained/',subregion_paths)
+        else:
+            print('No forecast for the test data with constrained 3D Var. Skipping analyses.')
 

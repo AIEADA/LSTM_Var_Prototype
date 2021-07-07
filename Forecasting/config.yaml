@@ -3,23 +3,23 @@
 # Location of various training/testing data
 data_paths:
   # For raw training and testing
-  training_coefficients: 'data/Z500/Training_Coefficients.npy'
-  training_mean: 'data/Z500/Training_mean.npy'
-  pod_modes: 'data/Z500/POD_Modes.npy'
-  testing_coefficients: 'data/Z500/Testing_Coefficients.npy'
+  training_coefficients: 'data/PWAT/Training_Coefficients.npy'
+  training_mean: 'data/PWAT/Training_mean.npy'
+  pod_modes: 'data/PWAT/POD_Modes.npy'
+  testing_coefficients: 'data/PWAT/Testing_Coefficients.npy'
 
   # For testing
-  training_fields: 'data/Z500/Training_snapshots.npy'
-  testing_fields: 'data/Z500/Testing_snapshots.npy'
+  training_fields: 'data/PWAT/Training_snapshots.npy'
+  testing_fields: 'data/PWAT/Testing_snapshots.npy'
 
   # Variational data assimilation
-  da_testing_fields: 'data/Z500/Testing_snapshots.npy'
+  da_testing_fields: 'data/PWAT/Testing_snapshots.npy'
 
   # Save locations
-  save_path: 'results/Z500/'
+  save_path: 'results/PWAT/'
 
   # Coordinate paths
-  cood_path: 'data/Z500/'
+  cood_path: 'data/PWAT/'
 
   # Regional analyses
   subregions:
@@ -34,15 +34,15 @@ data_paths:
 
 operation_mode:
   train: False
-  test: False # Perform test forecasts
+  test: True # Perform test forecasts
   perform_var: True # Perform 3D Var
-  constrained_var: True # Constrain some scales during 3DVar - only if perform_var is True
-  perform_analyses: False # Perform analyses on finished forecasts
+  constrained_var: False # Constrain some scales during 3DVar - only if perform_var is True
+  perform_analyses: True # Perform analyses on finished forecasts
 
 hyperparameters:
   - 5000 # num_observations
-  - 31 #input window
-  - 21 #output window
+  - 72 #input window
+  - 24 #output window
   - 0.7 # Train-valid split
   - 365 # 3D Var duration in test regime
   - 200 # Number of LSTM training epochs

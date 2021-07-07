@@ -232,7 +232,7 @@ class standard_lstm(Model):
         np.random.shuffle(rand_idx)
         rand_idx = rand_idx[:self.num_obs]
 
-        num_grid_points = test_fields.shape[0]
+        num_grid_points = test_fields.shape[1]
         num_observations = rand_idx.shape[0]
         total_dof = num_grid_points + num_observations
 
@@ -336,21 +336,22 @@ class standard_lstm(Model):
             print('Initial guess residual:',old_of, ', Final guess residual:',new_of)
 
             if new_of< old_of:
-                
                 assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
                 forecast_array[t] = self.call(assimilated_rec_input_seq).numpy()[0]
-
             else:
-
                 print('Optimization failed. Initial guess residual:',old_of, ', Final guess residual:',new_of)
-
                 x_input = x_input.reshape(1,self.seq_num,-1)
                 forecast_array[t] = self.call(x_input).numpy()[0]
-            
+
+            # Recording truth            
             true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
             
             print('Finished variational prediction for timestep: ',t)
 
+        # Rescale
+        for lead_time in range(forecast_array.shape[1]):
+            forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
+            true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
 
         return true_array, forecast_array
 
@@ -521,6 +522,11 @@ class standard_lstm(Model):
             true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
             
             print('Finished variational prediction for timestep: ',t)
+
+        # Rescale
+        for lead_time in range(forecast_array.shape[1]):
+            forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
+            true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
 
 
         return true_array, forecast_array

@@ -28,10 +28,10 @@ def perform_analyses(var_time,num_ips,num_ops,test_fields,snapshots_mean,pod_mod
         predicted = snapshots_mean[:,:,None] + np.matmul(pod_modes,pred_test.T).reshape(103,120,-1)
 
         # persistence predictions
-        persistence_fields = test_fields[:,:,num_ips-(lead_time+1):-(num_ops+lead_time+1)]
+        persistence_fields = test_fields[:,:,num_ips-(lead_time+1):num_ips-(lead_time+1)+var_time]
 
         # Post analyses - unify time slices
-        test_fields_temp = test_fields[:,:,num_ips+lead_time:-(num_ops-lead_time)]
+        test_fields_temp = test_fields[:,:,num_ips+lead_time:num_ips+lead_time+var_time]
 
         # Local analysis
         region_num = 0
@@ -72,10 +72,6 @@ def perform_analyses(var_time,num_ips,num_ops,test_fields,snapshots_mean,pod_mod
 
     # Make a plot of them
     plot_bars(persistence_maes,predicted_maes,subregions,save_path)
-
-
-
-
 
 
 
