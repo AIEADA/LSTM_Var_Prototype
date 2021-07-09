@@ -36,7 +36,7 @@ operation_mode:
   train: True
   test: True # Perform test forecasts
   perform_var: True # Perform 3D Var
-  constrained_var: True # Constrain some scales during 3DVar - only if perform_var is True
+  constrained_var: True # Constrain some scales during 3DVar
   perform_analyses: True # Perform analyses on finished forecasts
 
 hyperparameters:
