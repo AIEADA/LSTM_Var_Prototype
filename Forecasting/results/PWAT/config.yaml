@@ -13,7 +13,7 @@ data_paths:
   testing_fields: 'data/PWAT/Testing_snapshots.npy'
 
   # Variational data assimilation
-  da_testing_fields: 'data/PWAT/ERA5_Testing_snapshots.npy'
+  da_testing_fields: 'data/PWAT/Testing_snapshots.npy'
 
   # Save locations
   save_path: 'results/PWAT/'
@@ -33,9 +33,10 @@ data_paths:
     - 'data/subregions/Southwest_coarse.nc'
 
 operation_mode:
-  train: True
-  test: True # Perform test forecasts
+  train: False
+  test: False # Perform test forecasts
   perform_var: False # Perform 3D Var
+  constrained_var: True # Constrain some scales during 3DVar - only if perform_var is True
   perform_analyses: True # Perform analyses on finished forecasts
 
 hyperparameters:
@@ -46,3 +47,4 @@ hyperparameters:
   - 365 # 3D Var duration in test regime
   - 200 # Number of LSTM training epochs
   - 20 # Number of POD modes to truncate
+  - 10 # Number of fixed modes for constrained 3DVar (less than total number of POD modes)

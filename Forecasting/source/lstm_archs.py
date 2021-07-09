@@ -509,7 +509,8 @@ class standard_lstm(Model):
             print('Initial guess residual:',old_of, ', Final guess residual:',new_of)
 
             if new_of< old_of:
-                x_solution = np.concatenate((x_fixed,solution.x_var),axis=1).reshape(1,self.seq_num,-1)
+                xtemp = solution.x.reshape(self.seq_num,-1)
+                x_solution = np.concatenate((x_fixed,xtemp),axis=1).reshape(1,self.seq_num,-1)
                 forecast_array[t] = self.call(x_solution).numpy()[0]
 
             else:
