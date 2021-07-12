@@ -180,7 +180,11 @@ class standard_lstm(Model):
 
     # Load weights
     def restore_model(self):
-        self.load_weights(self.checkpoint_path+'./checkpoints/my_checkpoint') # Load pretrained model
+        try:
+            self.load_weights(self.checkpoint_path+'./checkpoints/my_checkpoint') # Load pretrained model
+        except:
+            print('Cannot find trained model in path specified.')
+            exit()
 
     def regular_inference(self,test_data):
         # Restore from checkpoint
