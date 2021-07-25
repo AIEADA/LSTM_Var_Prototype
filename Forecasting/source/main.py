@@ -25,12 +25,8 @@ if __name__ == '__main__':
     np.random.seed(10)
     from lstm_archs import standard_lstm
 
-    # Loading data
-    num_modes = hyperparameters[6]
-    train_data = np.load(data_paths['training_coefficients']).T[:,:num_modes]
-
     # Initialize model
-    lstm_model = standard_lstm(train_data,data_paths['save_path'],hyperparameters)
+    lstm_model = standard_lstm(data_paths,hyperparameters)
     
     # Training model
     if operation_mode['train']:
@@ -38,9 +34,8 @@ if __name__ == '__main__':
 
     # Regular testing of model
     if operation_mode['test']:
-        
-        test_data = np.load(data_paths['testing_coefficients']).T[:,:num_modes]
-        true, forecast = lstm_model.regular_inference(test_data)
+
+        true, forecast = lstm_model.regular_inference()
 
         if not os.path.exists(data_paths['save_path']+'/Regular/'):
             os.makedirs(data_paths['save_path']+'/Regular/')    
@@ -50,13 +45,7 @@ if __name__ == '__main__':
     # 3DVar testing of model
     if operation_mode['perform_var']:
         
-        test_data = np.load(data_paths['testing_coefficients']).T[:,:num_modes]
-        train_fields = np.load(data_paths['training_fields']).T
-        test_fields = np.load(data_paths['da_testing_fields']).T
-        pod_modes = np.load(data_paths['pod_modes'])[:,:num_modes]
-        training_mean = np.load(data_paths['training_mean'])
-
-        true, forecast = lstm_model.variational_inference(test_data,train_fields,test_fields,pod_modes,training_mean)
+        true, forecast = lstm_model.variational_inference()
 
         if not os.path.exists(data_paths['save_path']+'3DVar/'):
             os.makedirs(data_paths['save_path']+'3DVar/')
