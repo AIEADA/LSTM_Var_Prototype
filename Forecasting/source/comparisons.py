@@ -21,17 +21,19 @@ else:
     print('Regular forecasts do not exist. Stopping.')
     exit()
 
+var_data = True
 if os.path.exists(data_paths['save_path']+'/3DVar/'):
     var_maes = np.loadtxt(data_paths['save_path']+'/3DVar/'+'predicted_maes.txt')
 else:
-    print('3DVar forecasts do not exist. Stopping.')
-    exit()
+    print('Warning: 3DVar forecasts do not exist.')
+    var_data = False
 
-# if os.path.exists(data_paths['save_path']+'/3DVar_Constrained/'):
-#     cons_var_maes = np.loadtxt(data_paths['save_path']+'/3DVar_Constrained/'+'predicted_maes.txt')
-# else:
-#     print('Constrained 3DVar forecasts do not exist. Stopping.')
-#     exit()
+cvar_data = True
+if os.path.exists(data_paths['save_path']+'/3DVar_Constrained/'):
+    cons_var_maes = np.loadtxt(data_paths['save_path']+'/3DVar_Constrained/'+'predicted_maes.txt')
+else:
+    print('Warning: Constrained 3DVar forecasts do not exist.')
+    cvar_data = False
 
 iter_num = 0
 for subregion in subregion_paths:
@@ -40,8 +42,13 @@ for subregion in subregion_paths:
     plt.title('MAE for '+fname)
     plt.plot(persistence_maes[:,iter_num],label='Persistence')
     plt.plot(regular_maes[:,iter_num],label='Regular')
-    plt.plot(var_maes[:,iter_num],label='3DVar')
-    #plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
+
+    if var_data:
+        plt.plot(var_maes[:,iter_num],label='3DVar')
+
+    if cvar_data:
+        plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
+    
     plt.legend()
     plt.xlabel('Timesteps')
     plt.ylabel('MAE')
