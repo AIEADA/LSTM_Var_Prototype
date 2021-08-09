@@ -256,13 +256,9 @@ class standard_lstm(Model):
 
             # Likelihood
             x = x.reshape(1,self.seq_num,-1)
-            print("x shape\n")
-            print(np.shape(x))
-
+            
             #x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
             x_tf = x[0]
-            print("x_tf shape\n")
-            print(np.shape(x_tf))
             x_tf_rec = np.matmul(pod_modes,x_tf.T)
 
             # Sensor predictions
@@ -273,8 +269,8 @@ class standard_lstm(Model):
 
             
             
-            #return pred
-            return (pred-min_val)/(5000*(max_val-min_val))
+            return pred
+            #return (pred-min_val)/(5000*(max_val-min_val))
 
         # Define gradient of residual
         def residual_gradient(x):
@@ -323,7 +319,7 @@ class standard_lstm(Model):
                 pred = (tf.math.reduce_sum(0.5*(tf_x_star_rec - tf_x_ti_rec)**2)) + \
                         (tf.math.reduce_sum(0.5*(tf_y_-h_)**2))
 
-                pred = (pred-min_val)/(5000*(max_val-min_val))
+                #pred = (pred-min_val)/(5000*(max_val-min_val))
 
             grad = t.gradient(pred, x).numpy()[0,:,:].flatten().astype('double')
              
