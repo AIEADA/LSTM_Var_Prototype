@@ -356,7 +356,7 @@ class standard_lstm(Model):
                 forecast_array[t-7] = self.call(x_input).numpy()[0]
 
             # Recording truth            
-            true_array[t-7] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
             
             print('Finished variational prediction for timestep: ',t)
 
