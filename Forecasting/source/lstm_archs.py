@@ -256,7 +256,13 @@ class standard_lstm(Model):
 
             # Likelihood
             x = x.reshape(1,self.seq_num,-1)
-            x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+            print("x shape\n")
+            print(np.shape(x))
+
+            #x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+            x_tf = x[0]
+            print("x_tf shape\n")
+            print(np.shape(x_tf))
             x_tf_rec = np.matmul(pod_modes,x_tf.T)
 
             # Sensor predictions
@@ -264,7 +270,10 @@ class standard_lstm(Model):
 
             # J
             pred = (np.sum(0.5*(x_star_rec - x_ti_rec)**2)) + (np.sum(0.5*(y_-h_)**2))
+
             
+            
+            #return pred
             return (pred-min_val)/(5000*(max_val-min_val))
 
         # Define gradient of residual
@@ -292,14 +301,16 @@ class standard_lstm(Model):
 
                 x = tf.reshape(x,shape=[1,self.seq_num,-1])
 
-                op = self.call(x)[0]
+                op = x[0]
 
-                # For both minmax, stdscaler
+                # op = self.call(x)[0]
+
+                # # For both minmax, stdscaler
+                # # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                # # op = (op)*std_scaler.scale_ + std_scaler.mean_
+
                 # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                # op = (op)*std_scaler.scale_ + std_scaler.mean_
-
-                op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                op = tf.cast(op,dtype='float64')
+                # op = tf.cast(op,dtype='float64')
 
                 x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
 
@@ -329,6 +340,7 @@ class standard_lstm(Model):
 
             # Observation
             y_ = true_observations[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            
 
             # Perform optimization
             solution = minimize(residual,x_input.flatten(), jac=residual_gradient, method='SLSQP',
@@ -341,14 +353,14 @@ class standard_lstm(Model):
 
             if new_of< old_of:
                 assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
-                forecast_array[t] = self.call(assimilated_rec_input_seq).numpy()[0]
+                forecast_array[t-7] = self.call(assimilated_rec_input_seq).numpy()[0]
             else:
                 print('Optimization failed. Initial guess residual:',old_of, ', Final guess residual:',new_of)
                 x_input = x_input.reshape(1,self.seq_num,-1)
-                forecast_array[t] = self.call(x_input).numpy()[0]
+                forecast_array[t-7] = self.call(x_input).numpy()[0]
 
             # Recording truth            
-            true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            true_array[t-7] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
             
             print('Finished variational prediction for timestep: ',t)
 
