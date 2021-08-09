@@ -1,0 +1,50 @@
+# YAML file for running POD-LSTM training, testing, data assimilation
+
+# Location of various training/testing data
+data_paths:
+  # For raw training and testing
+  training_coefficients: 'data/PWAT/Training_Coefficients.npy'
+  training_mean: 'data/PWAT/Training_mean.npy'
+  pod_modes: 'data/PWAT/POD_Modes.npy'
+  testing_coefficients: 'data/PWAT/Testing_Coefficients.npy'
+
+  # For testing
+  training_fields: 'data/PWAT/Training_snapshots.npy'
+  testing_fields: 'data/PWAT/Testing_snapshots.npy'
+
+  # Variational data assimilation
+  da_testing_fields: 'data/PWAT/Testing_snapshots.npy'
+
+  # Save locations
+  save_path: 'results/PWAT_Flatline_NS/'
+
+  # Coordinate paths
+  cood_path: 'data/PWAT/'
+
+  # Regional analyses
+  subregions:
+    - 'data/subregions/Alaska_coarse.nc'
+    - 'data/subregions/Midwest_coarse.nc'
+    - 'data/subregions/NGreatPlains_coarse.nc'
+    - 'data/subregions/Northeast_coarse.nc'
+    - 'data/subregions/Northwest_coarse.nc'
+    - 'data/subregions/SGreatPlains_coarse.nc'
+    - 'data/subregions/Southeast_coarse.nc'
+    - 'data/subregions/Southwest_coarse.nc'
+
+operation_mode:
+  train: True
+  test: True # Perform test forecasts
+  perform_var: True # Perform 3D Var
+  constrained_var: False # Constrain some scales during 3DVar - only if perform_var is True
+  perform_analyses: True # Perform analyses on finished forecasts
+
+hyperparameters:
+  - 5000 # num_observations
+  - 72 #input window
+  - 24 #output window
+  - 0.7 # Train-valid split
+  - 365 # 3D Var duration in test regime
+  - 2000 # Number of LSTM training epochs
+  - 5 # Number of POD modes to truncate
+  - 3 # Number of fixed modes for constrained 3DVar (less than total number of POD modes)
