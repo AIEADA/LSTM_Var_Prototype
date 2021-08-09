@@ -349,11 +349,11 @@ class standard_lstm(Model):
 
             if new_of< old_of:
                 assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
-                forecast_array[t-7] = self.call(assimilated_rec_input_seq).numpy()[0]
+                forecast_array[t] = self.call(assimilated_rec_input_seq).numpy()[0]
             else:
                 print('Optimization failed. Initial guess residual:',old_of, ', Final guess residual:',new_of)
                 x_input = x_input.reshape(1,self.seq_num,-1)
-                forecast_array[t-7] = self.call(x_input).numpy()[0]
+                forecast_array[t] = self.call(x_input).numpy()[0]
 
             # Recording truth            
             true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
