@@ -16,7 +16,7 @@ data_paths:
   da_testing_fields: 'data/PWAT/Testing_snapshots.npy'
 
   # Save locations
-  save_path: 'results/PWAT_RepeatVector/'
+  save_path: 'results/PWAT_Flatline_NS/'
 
   # Coordinate paths
   cood_path: 'data/PWAT/'
@@ -33,11 +33,11 @@ data_paths:
     - 'data/subregions/Southwest_coarse.nc'
 
 operation_mode:
-  train: False
-  test: False # Perform test forecasts
+  train: True
+  test: True # Perform test forecasts
   perform_var: True # Perform 3D Var
   constrained_var: False # Constrain some scales during 3DVar - only if perform_var is True
-  perform_analyses: False # Perform analyses on finished forecasts
+  perform_analyses: True # Perform analyses on finished forecasts
 
 hyperparameters:
   - 5000 # num_observations
@@ -45,6 +45,6 @@ hyperparameters:
   - 24 #output window
   - 0.7 # Train-valid split
   - 365 # 3D Var duration in test regime
-  - 500 # Number of LSTM training epochs
+  - 2000 # Number of LSTM training epochs
   - 5 # Number of POD modes to truncate
   - 3 # Number of fixed modes for constrained 3DVar (less than total number of POD modes)

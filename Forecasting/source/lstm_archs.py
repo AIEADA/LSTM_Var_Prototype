@@ -69,10 +69,16 @@ class standard_lstm(Model):
         # Define architecture
         xavier=tf.keras.initializers.GlorotUniform()
 
-        self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len))
-        self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
-        self.l2=tf.keras.layers.LSTM(50,return_sequences=True)
-        self.out = tf.keras.layers.Dense(self.state_len)
+        # self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len))
+        # self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
+        # self.l2=tf.keras.layers.LSTM(50,return_sequences=True)
+        # self.out = tf.keras.layers.Dense(self.state_len)
+        # self.train_op = tf.keras.optimizers.Adam(learning_rate=0.001)
+
+        self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu')
+        self.l2 = tf.keras.layers.RepeatVector(self.seq_num_op)
+        self.l3=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')       
+        self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
         self.train_op = tf.keras.optimizers.Adam(learning_rate=0.001)
 
         # # Prioritize according to scaled singular values
@@ -90,12 +96,17 @@ class standard_lstm(Model):
 
     # Running the model
     def call(self,X):
+        # h1 = self.l1(X)
+        # h2 = tf.transpose(h1,perm=[0,2,1])
+        # h3 = self.l1_transform(h2)
+        # h4 = tf.transpose(h3,perm=[0,2,1])
+        # h5 = self.l2(h4)
+        # out = self.out(h5)
+
         h1 = self.l1(X)
-        h2 = tf.transpose(h1,perm=[0,2,1])
-        h3 = self.l1_transform(h2)
-        h4 = tf.transpose(h3,perm=[0,2,1])
-        h5 = self.l2(h4)
-        out = self.out(h5)
+        h2 = self.l2(h1)
+        h3 = self.l3(h2)
+        out = self.out(h3)
 
         return out
     
@@ -245,6 +256,7 @@ class standard_lstm(Model):
         # Non-recursive prediction
         forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
         true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
+        obj_array = np.zeros(shape=(test_total_size,5))
 
         # Define residual
         x_ti_rec = None; y_ = None
@@ -266,6 +278,25 @@ class standard_lstm(Model):
             pred = (np.sum(0.5*(x_star_rec - x_ti_rec)**2)) + (np.sum(0.5*(y_-h_)**2))
             
             return (pred-min_val)/(5000*(max_val-min_val))
+
+        def residual_split(x):
+            # Prior
+            x = x.reshape(self.seq_num,-1)
+            xphys = self.preproc_pipeline.inverse_transform(x)
+            x_star_rec = np.matmul(pod_modes,xphys.T)#[:,0:1]
+
+            # Likelihood
+            x = x.reshape(1,self.seq_num,-1)
+            x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+            x_tf_rec = np.matmul(pod_modes,x_tf.T)
+
+            # Sensor predictions
+            h_ = x_tf_rec[rand_idx,:].T
+
+            # J
+            pred = (np.sum(0.5*(x_star_rec - x_ti_rec)**2)) + (np.sum(0.5*(y_-h_)**2))
+            
+            return pred, np.sum(0.5*(x_star_rec - x_ti_rec)**2), np.sum(0.5*(y_-h_)**2)
 
         # Define gradient of residual
         def residual_gradient(x):
@@ -334,14 +365,22 @@ class standard_lstm(Model):
             solution = minimize(residual,x_input.flatten(), jac=residual_gradient, method='SLSQP',
                 tol=1e-3,options={'disp': True, 'maxiter': 20, 'eps': 1.4901161193847656e-8})
 
-            old_of = residual(x_input.flatten())
-            new_of = residual(solution.x)
+            old_of, old_bg, old_ll = residual_split(x_input.flatten())
+            new_of, new_bg, new_ll = residual_split(solution.x)
 
             print('Initial guess residual:',old_of, ', Final guess residual:',new_of)
+            print('Initial background:',old_bg,'Final background:',new_bg)
+            print('Initial Likelihood:',old_ll,'Final Likelihood:',new_ll)
+
+            obj_array[t,0] = old_bg
+            obj_array[t,1] = old_ll
+            obj_array[t,2] = new_bg
+            obj_array[t,3] = new_ll
 
             if new_of< old_of:
                 assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
                 forecast_array[t] = self.call(assimilated_rec_input_seq).numpy()[0]
+                obj_array[t,4] = 1
             else:
                 print('Optimization failed. Initial guess residual:',old_of, ', Final guess residual:',new_of)
                 x_input = x_input.reshape(1,self.seq_num,-1)
@@ -357,7 +396,7 @@ class standard_lstm(Model):
             forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
             true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
 
-        return true_array, forecast_array
+        return true_array, forecast_array, obj_array
 
     def constrained_variational_inference(self,test_data,train_fields,test_fields,pod_modes,training_mean,num_fixed_modes):
         # Restore from checkpoint

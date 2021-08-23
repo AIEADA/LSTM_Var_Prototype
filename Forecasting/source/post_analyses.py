@@ -73,6 +73,29 @@ def perform_analyses(var_time,num_ips,num_ops,test_fields,snapshots_mean,pod_mod
     # Make a plot of them
     plot_bars(persistence_maes,predicted_maes,subregions,save_path)
 
+def plot_obj(obj_array,save_path):
+    
+    fig,ax = plt.subplots(nrows=1,ncols=3)
+    ax[0].plot(obj_array[:0],label='Old background')
+    ax[0].plot(obj_array[:1],label='Old likelihood')
+    ax[0].legend()
+    ax[0].set_xlabel('Timestep')
+
+
+    ax[1].plot(obj_array[:2],label='New background')
+    ax[1].plot(obj_array[:3],label='New likelihood')
+    ax[1].legend()
+    ax[1].set_xlabel('Timestep')
+
+    ax[1].plot(obj_array[:4],label='0-Fail, 1-Success')
+    ax[1].legend()
+    ax[1].set_xlabel('Timestep')
+
+    if isinstance(save_path,str):
+        plt.savefig(save_path)
+    plt.close()
+
+
 
 
 

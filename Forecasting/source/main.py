@@ -56,12 +56,13 @@ if __name__ == '__main__':
         pod_modes = np.load(data_paths['pod_modes'])[:,:num_modes]
         training_mean = np.load(data_paths['training_mean'])
 
-        true, forecast = lstm_model.variational_inference(test_data,train_fields,test_fields,pod_modes,training_mean)
+        retval = lstm_model.variational_inference(test_data,train_fields,test_fields,pod_modes,training_mean)
 
         if not os.path.exists(data_paths['save_path']+'3DVar/'):
             os.makedirs(data_paths['save_path']+'3DVar/')
-        np.save(data_paths['save_path']+'/3DVar/True.npy',true)
-        np.save(data_paths['save_path']+'/3DVar/Predicted.npy',forecast)
+        np.save(data_paths['save_path']+'/3DVar/True.npy',retval[0])
+        np.save(data_paths['save_path']+'/3DVar/Predicted.npy',retval[1])
+        np.save(data_paths['save_path']+'/3DVar/Objective_Functions.npy',retval[2])
 
     # Constrained 3DVar testing of model
     if operation_mode['constrained_var']:
@@ -84,7 +85,7 @@ if __name__ == '__main__':
 
     if operation_mode['perform_analyses']:
 
-        from post_analyses import perform_analyses
+        from post_analyses import perform_analyses, plot_obj
        
         pod_modes = np.load(data_paths['pod_modes'])[:,:num_modes]
         training_mean = np.load(data_paths['training_mean'])
@@ -108,6 +109,10 @@ if __name__ == '__main__':
             perform_analyses(var_time,num_inputs,num_outputs,
                             test_fields,training_mean,pod_modes,forecast,
                             data_paths['save_path']+'/3DVar/',subregion_paths)
+
+            obj_array = np.load(data_paths['save_path']+'/3DVar/Predicted.npy')
+            plot_obj(obj_array,data_paths['save_path']+'/3DVar/')
+
         else:
             print('No forecast for the test data with 3D Var. Skipping analyses.')
 
