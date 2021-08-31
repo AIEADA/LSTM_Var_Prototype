@@ -397,8 +397,8 @@ class standard_lstm(Model):
                     # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
                     # op = (op)*std_scaler.scale_ + std_scaler.mean_
                     op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                    op = tf.cast(op,dtype='float64')
-
+                
+                op = tf.cast(op,dtype='float64')
                 x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
 
 
@@ -616,8 +616,8 @@ class standard_lstm(Model):
                     # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
                     # op = (op)*std_scaler.scale_ + std_scaler.mean_
                     op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                    op = tf.cast(op,dtype='float64')
-
+                
+                op = tf.cast(op,dtype='float64')
                 x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
 
 
