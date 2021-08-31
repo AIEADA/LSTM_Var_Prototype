@@ -26,11 +26,12 @@ def coeff_determination(y_pred, y_true): #Order of function inputs is important 
     SS_tot = np.sum(np.square( y_true - np.mean(y_true) ) )
     return ( 1 - SS_res/(SS_tot + 2.22044604925e-16) )
 
-def plot_bars(ref,pred,subregions,save_path):
+def plot_bars(ref1,ref2,pred,subregions,save_path):
 
     for i in range(pred.shape[1]): # Each region
         plt.figure()
-        plt.plot(ref[:,i],label='Reference')
+        plt.plot(ref1[:,i],label='Persistence')
+        plt.plot(ref2[:,i],label='Climatology')
         plt.plot(pred[:,i],label='Prediction')
         plt.legend()
         if isinstance(save_path,str):

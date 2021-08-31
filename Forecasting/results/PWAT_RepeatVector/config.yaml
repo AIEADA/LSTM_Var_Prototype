@@ -35,9 +35,9 @@ data_paths:
 operation_mode:
   train: False
   test: False # Perform test forecasts
-  perform_var: True # Perform 3D Var
+  perform_var: False # Perform 3D Var
   constrained_var: False # Constrain some scales during 3DVar - only if perform_var is True
-  perform_analyses: False # Perform analyses on finished forecasts
+  perform_analyses: True # Perform analyses on finished forecasts
 
 hyperparameters:
   - 5000 # num_observations
@@ -48,3 +48,4 @@ hyperparameters:
   - 500 # Number of LSTM training epochs
   - 5 # Number of POD modes to truncate
   - 3 # Number of fixed modes for constrained 3DVar (less than total number of POD modes)
+  - 4 # Cadence (i.e., number of snapshots per day for instance 1 for Z500 and 4 for PWAT)

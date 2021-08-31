@@ -16,6 +16,7 @@ config_file.close()
 # Load standard results
 if os.path.exists(data_paths['save_path']+'/Regular/'):
     persistence_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'persistence_maes.txt')
+    climatology_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'climatology_maes.txt')
     regular_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'predicted_maes.txt')
 else:
     print('Regular forecasts do not exist. Stopping.')
@@ -41,6 +42,7 @@ for subregion in subregion_paths:
     plt.figure()
     plt.title('MAE for '+fname)
     plt.plot(persistence_maes[:,iter_num],label='Persistence')
+    plt.plot(climatology_maes[:,iter_num],label='Climatology')
     plt.plot(regular_maes[:,iter_num],label='Regular')
 
     if var_data:

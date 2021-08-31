@@ -32,8 +32,18 @@ class standard_lstm(Model):
         self.data_tsteps = np.shape(data)[0]
         self.state_len = np.shape(data)[1]
 
-        self.preproc_pipeline = Pipeline([('minmaxscaler', MinMaxScaler())])
-        self.data = self.preproc_pipeline.fit_transform(data)
+        if params[9] == 1:
+            self.scaling = 1
+            # Affine transformation
+            self.scale_factor = np.max(np.abs(data))
+            self.data = data/self.scale_factor
+
+            self.trans_factor = np.abs(np.min(self.data)) + 1.0e-6
+            self.data = self.data + self.trans_factor
+        else:
+            self.scaling = 0
+            self.preproc_pipeline = Pipeline([('minmaxscaler', MinMaxScaler())])
+            self.data = self.preproc_pipeline.fit_transform(data)
 
         # Need to make minibatches
         self.seq_num = params[1]
@@ -202,7 +212,11 @@ class standard_lstm(Model):
         self.restore_model()
 
         # Scale testing data
-        test_data = self.preproc_pipeline.transform(test_data)
+        if self.scaling == 1:
+            test_data = test_data/self.scale_factor
+            test_data = test_data + self.trans_factor
+        else:
+            test_data = self.preproc_pipeline.transform(test_data)
 
         # Test data has to be scaled already
         test_total_size = np.shape(test_data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
@@ -216,9 +230,18 @@ class standard_lstm(Model):
             true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
 
         # Rescale
-        for lead_time in range(forecast_array.shape[1]):
-            forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
-            true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
+        if self.scaling == 1:
+            for lead_time in range(forecast_array.shape[1]):
+                forecast_array[:,lead_time,:] = forecast_array[:,lead_time,:] - self.trans_factor
+                forecast_array[:,lead_time,:] = forecast_array[:,lead_time,:]*self.trans_factor
+
+                true_array[:,lead_time,:] = true_array[:,lead_time,:] - self.trans_factor
+                true_array[:,lead_time,:] = true_array[:,lead_time,:]*self.trans_factor
+        else:
+            for lead_time in range(forecast_array.shape[1]):
+                forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
+                true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
+
 
         return true_array, forecast_array
 
@@ -227,7 +250,11 @@ class standard_lstm(Model):
         self.restore_model()
 
         # Scale testing data
-        test_data = self.preproc_pipeline.transform(test_data)
+        if self.scaling == 1:
+            test_data = test_data/self.scale_factor
+            test_data = test_data + self.trans_factor
+        else:
+            test_data = self.preproc_pipeline.transform(test_data)
 
         # Test data has to be scaled already
         test_total_size = np.shape(test_data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
@@ -263,12 +290,26 @@ class standard_lstm(Model):
         def residual(x):
             # Prior
             x = x.reshape(self.seq_num,-1)
-            xphys = self.preproc_pipeline.inverse_transform(x)
+
+            # Scale testing data
+            if self.scaling == 1:
+                xphys = x/self.scale_factor
+                xphys = xphys + self.trans_factor
+            else:
+                xphys = self.preproc_pipeline.inverse_transform(x)
+            
             x_star_rec = np.matmul(pod_modes,xphys.T)#[:,0:1]
 
             # Likelihood
             x = x.reshape(1,self.seq_num,-1)
-            x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+
+            # Scale
+            if self.scaling == 1:
+                x_tf = self.call(x).numpy()[0].reshape(self.seq_num_op,-1)/self.scale_factor
+                x_tf = x_tf + self.trans_factor
+            else:
+                x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+
             x_tf_rec = np.matmul(pod_modes,x_tf.T)
 
             # Sensor predictions
@@ -282,12 +323,26 @@ class standard_lstm(Model):
         def residual_split(x):
             # Prior
             x = x.reshape(self.seq_num,-1)
-            xphys = self.preproc_pipeline.inverse_transform(x)
+            
+            # Scale testing data
+            if self.scaling == 1:
+                xphys = x/self.scale_factor
+                xphys = xphys + self.trans_factor
+            else:
+                xphys = self.preproc_pipeline.inverse_transform(x)
+
             x_star_rec = np.matmul(pod_modes,xphys.T)#[:,0:1]
 
             # Likelihood
             x = x.reshape(1,self.seq_num,-1)
-            x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+            
+            # Scale
+            if self.scaling == 1:
+                x_tf = self.call(x).numpy()[0].reshape(self.seq_num_op,-1)/self.scale_factor
+                x_tf = x_tf + self.trans_factor
+            else:
+                x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+
             x_tf_rec = np.matmul(pod_modes,x_tf.T)
 
             # Sensor predictions
@@ -302,7 +357,14 @@ class standard_lstm(Model):
         def residual_gradient(x):
             # Prior
             x = x.reshape(self.seq_num,-1).astype('double')
-            xphys = self.preproc_pipeline.inverse_transform(x)
+            
+            # Scale testing data
+            if self.scaling == 1:
+                xphys = x/self.scale_factor
+                xphys = xphys + self.trans_factor
+            else:
+                xphys = self.preproc_pipeline.inverse_transform(x)
+
             tf_x_star_rec = tf.convert_to_tensor(np.matmul(pod_modes,xphys.T),dtype='float64')#[:,0:1]
             tf_x_ti_rec = tf.convert_to_tensor(x_ti_rec,dtype='float64')
             tf_y_ = tf.convert_to_tensor(y_,dtype='float64')
@@ -316,7 +378,8 @@ class standard_lstm(Model):
             # std_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
             # minmax_scaler = self.preproc_pipeline.get_params()['steps'][1][1]
 
-            minmax_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
+            if self.scaling == 0:
+                minmax_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
 
             with tf.GradientTape(persistent=True) as t:
                 t.watch(x)
@@ -325,12 +388,16 @@ class standard_lstm(Model):
 
                 op = self.call(x)[0]
 
-                # For both minmax, stdscaler
-                # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                # op = (op)*std_scaler.scale_ + std_scaler.mean_
-
-                op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                op = tf.cast(op,dtype='float64')
+                # Unscale
+                if self.scaling == 1:
+                    op = op/self.scale_factor
+                    op = op + self.trans_factor
+                else:
+                    # For both minmax, stdscaler
+                    # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                    # op = (op)*std_scaler.scale_ + std_scaler.mean_
+                    op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                    op = tf.cast(op,dtype='float64')
 
                 x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
 
@@ -355,7 +422,14 @@ class standard_lstm(Model):
 
             # Background vector - initial time window input
             x_input = test_data[t:t+self.seq_num].reshape(self.seq_num,self.state_len)
-            x_ti = self.preproc_pipeline.inverse_transform(x_input)
+
+            # Scale testing data
+            if self.scaling == 1:
+                x_ti = x_input/self.scale_factor
+                x_ti = x_ti + self.trans_factor
+            else:
+                x_ti = self.preproc_pipeline.inverse_transform(x_input)
+
             x_ti_rec = np.matmul(pod_modes,x_ti.T)#[:,0:1]
 
             # Observation
@@ -392,9 +466,17 @@ class standard_lstm(Model):
             print('Finished variational prediction for timestep: ',t)
 
         # Rescale
-        for lead_time in range(forecast_array.shape[1]):
-            forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
-            true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
+        if self.scaling == 1:
+            for lead_time in range(forecast_array.shape[1]):
+                forecast_array[:,lead_time,:] = forecast_array[:,lead_time,:] - self.trans_factor
+                forecast_array[:,lead_time,:] = forecast_array[:,lead_time,:]*self.trans_factor
+
+                true_array[:,lead_time,:] = true_array[:,lead_time,:] - self.trans_factor
+                true_array[:,lead_time,:] = true_array[:,lead_time,:]*self.trans_factor
+        else:
+            for lead_time in range(forecast_array.shape[1]):
+                forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
+                true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
 
         return true_array, forecast_array, obj_array
 
@@ -403,7 +485,11 @@ class standard_lstm(Model):
         self.restore_model()
 
         # Scale testing data
-        test_data = self.preproc_pipeline.transform(test_data)
+        if self.scaling == 1:
+            test_data = test_data/self.scale_factor
+            test_data = test_data + self.trans_factor
+        else:
+            test_data = self.preproc_pipeline.transform(test_data)
 
         # Test data has to be scaled already
         test_total_size = np.shape(test_data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
@@ -450,12 +536,25 @@ class standard_lstm(Model):
             x = x.reshape(self.seq_num,-1)
             x = np.concatenate((x_fixed,x),axis=1)
 
-            xphys = self.preproc_pipeline.inverse_transform(x)
+            # Scale testing data
+            if self.scaling == 1:
+                xphys = x/self.scale_factor
+                xphys = xphys + self.trans_factor
+            else:
+                xphys = self.preproc_pipeline.inverse_transform(x)
+
             x_star_rec = np.matmul(pod_modes,xphys.T)#[:,0:1]
 
             # Likelihood
             x = x.reshape(1,self.seq_num,-1)
-            x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+            
+            # Scale
+            if self.scaling == 1:
+                x_tf = self.call(x).numpy()[0].reshape(self.seq_num_op,-1)/self.scale_factor
+                x_tf = x_tf + self.trans_factor
+            else:
+                x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+
             x_tf_rec = np.matmul(pod_modes,x_tf.T)
 
             # Sensor predictions
@@ -472,7 +571,13 @@ class standard_lstm(Model):
             x_var = x_var.reshape(self.seq_num,-1)
             x = np.concatenate((x_fixed,x_var),axis=1)
 
-            xphys = self.preproc_pipeline.inverse_transform(x)
+            # Scale testing data
+            if self.scaling == 1:
+                xphys = x/self.scale_factor
+                xphys = xphys + self.trans_factor
+            else:
+                xphys = self.preproc_pipeline.inverse_transform(x)
+
             tf_x_star_rec = tf.convert_to_tensor(np.matmul(pod_modes,xphys.T),dtype='float64')#[:,0:1]
             tf_x_ti_rec = tf.convert_to_tensor(x_ti_rec,dtype='float64')
             tf_y_ = tf.convert_to_tensor(y_,dtype='float64')
@@ -492,7 +597,8 @@ class standard_lstm(Model):
             # std_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
             # minmax_scaler = self.preproc_pipeline.get_params()['steps'][1][1]
 
-            minmax_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
+            if self.scaling == 0:
+                minmax_scaler = self.preproc_pipeline.get_params()['steps'][0][1]
 
             with tf.GradientTape(persistent=True) as t:
                 t.watch(x_var_tf)
@@ -501,12 +607,16 @@ class standard_lstm(Model):
                 x = tf.reshape(x,shape=[1,self.seq_num,-1])
                 op = self.call(x)[0]
 
-                # For both minmax, stdscaler
-                # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                # op = (op)*std_scaler.scale_ + std_scaler.mean_
-
-                op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
-                op = tf.cast(op,dtype='float64')
+                # Unscale
+                if self.scaling == 1:
+                    op = op/self.scale_factor
+                    op = op + self.trans_factor
+                else:
+                    # For both minmax, stdscaler
+                    # op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                    # op = (op)*std_scaler.scale_ + std_scaler.mean_
+                    op = (op+1)/2.0*(minmax_scaler.data_max_- minmax_scaler.data_min_) + minmax_scaler.data_min_
+                    op = tf.cast(op,dtype='float64')
 
                 x_tf_rec = tf.matmul(tf_pod_modes,tf.transpose(op))
 
@@ -536,7 +646,13 @@ class standard_lstm(Model):
             x_fixed = x_input[:,:num_fixed_modes]
             x_var = x_input[:,num_fixed_modes:]
 
-            x_ti = self.preproc_pipeline.inverse_transform(x_input)
+            # Scale testing data
+            if self.scaling == 1:
+                x_ti = x_input/self.scale_factor
+                x_ti = x_ti + self.trans_factor
+            else:
+                x_ti = self.preproc_pipeline.inverse_transform(x_input)
+
             x_ti_rec = np.matmul(pod_modes,x_ti.T)#[:,0:1]
 
             # Observation
@@ -568,9 +684,18 @@ class standard_lstm(Model):
             print('Finished variational prediction for timestep: ',t)
 
         # Rescale
-        for lead_time in range(forecast_array.shape[1]):
-            forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
-            true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
+        if self.scaling == 1:
+            for lead_time in range(forecast_array.shape[1]):
+                forecast_array[:,lead_time,:] = forecast_array[:,lead_time,:] - self.trans_factor
+                forecast_array[:,lead_time,:] = forecast_array[:,lead_time,:]*self.trans_factor
+
+                true_array[:,lead_time,:] = true_array[:,lead_time,:] - self.trans_factor
+                true_array[:,lead_time,:] = true_array[:,lead_time,:]*self.trans_factor
+        else:
+            for lead_time in range(forecast_array.shape[1]):
+                forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
+                true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
+
 
 
         return true_array, forecast_array
