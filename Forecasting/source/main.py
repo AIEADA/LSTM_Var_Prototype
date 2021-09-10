@@ -9,6 +9,7 @@ configuration = yaml.load(config_file,Loader=yaml.FullLoader)
 data_paths = configuration['data_paths']
 subregion_paths = data_paths['subregions']
 operation_mode = configuration['operation_mode']
+model_choice = operation_mode['model_choice']
 hyperparameters = configuration.get('hyperparameters')
 
 config_file.close()
@@ -23,14 +24,14 @@ if __name__ == '__main__':
 
     import numpy as np
     np.random.seed(10)
-    from lstm_archs import standard_lstm
+    from lstm_archs import emulator
 
     # Loading data
     num_modes = hyperparameters[6]
     train_data = np.load(data_paths['training_coefficients']).T[:,:num_modes]
 
     # Initialize model
-    lstm_model = standard_lstm(train_data,data_paths['save_path'],hyperparameters)
+    lstm_model = emulator(train_data,data_paths['save_path'],hyperparameters,model_choice)
     
     # Training model
     if operation_mode['train']:
@@ -91,11 +92,12 @@ if __name__ == '__main__':
         num_outputs = hyperparameters[2]
         var_time = hyperparameters[4]
         cadence = hyperparameters[8]
+        output_gap = hyperparameters[10]
 
         if os.path.isfile(data_paths['save_path']+'/Regular/Predicted.npy'):
             forecast = np.load(data_paths['save_path']+'/Regular/Predicted.npy')
             test_fields = np.load(data_paths['da_testing_fields'])
-            perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,num_modes,
+            perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
                             test_fields,forecast,
                             data_paths['save_path']+'/Regular/',subregion_paths)
         else:
@@ -104,7 +106,7 @@ if __name__ == '__main__':
         if os.path.isfile(data_paths['save_path']+'/3DVar/Predicted.npy'):
             forecast = np.load(data_paths['save_path']+'/3DVar/Predicted.npy')
             test_fields = np.load(data_paths['da_testing_fields'])
-            perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,num_modes,
+            perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
                             test_fields,forecast,
                             data_paths['save_path']+'/3DVar/',subregion_paths)
 
@@ -118,7 +120,7 @@ if __name__ == '__main__':
         if os.path.isfile(data_paths['save_path']+'/3DVar_Constrained/Predicted.npy'):
             forecast = np.load(data_paths['save_path']+'/3DVar_Constrained/Predicted.npy')
             test_fields = np.load(data_paths['da_testing_fields'])
-            perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,num_modes,
+            perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
                             test_fields,forecast,
                             data_paths['save_path']+'/3DVar_Constrained/',subregion_paths)
         else:

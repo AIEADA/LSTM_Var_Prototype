@@ -4,6 +4,7 @@ parent_path = os.path.dirname(dir_path)
 
 import tensorflow as tf
 tf.random.set_seed(10)
+tf.keras.backend.set_floatx('float64')
 
 from tensorflow.keras import Model
 import numpy as np
@@ -22,9 +23,9 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
 #Build the model which does basic map of inputs to coefficients
-class standard_lstm(Model):
-    def __init__(self,data,checkpoint_path,params):
-        super(standard_lstm, self).__init__()
+class emulator(Model):
+    def __init__(self,data,checkpoint_path,params,model_choice):
+        super(emulator, self).__init__()
 
         self.num_obs = params[0]
 
@@ -48,8 +49,9 @@ class standard_lstm(Model):
         # Need to make minibatches
         self.seq_num = params[1]
         self.seq_num_op = params[2]
+        self.seq_num_gap = params[10]
 
-        self.total_size = np.shape(data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
+        self.total_size = np.shape(data)[0]-int(self.seq_num_op+self.seq_num+self.seq_num_gap) # Limit of sampling
 
         input_seq = np.zeros(shape=(self.total_size,self.seq_num,self.state_len))  #[samples,n_inputs,state_len]
         output_seq = np.zeros(shape=(self.total_size,self.seq_num_op,self.state_len)) #[samples,n_outputs,state_len]
@@ -57,7 +59,7 @@ class standard_lstm(Model):
         snum = 0
         for t in range(0,self.total_size):
             input_seq[snum,:,:] = self.data[None,t:t+self.seq_num,:]
-            output_seq[snum,:] = self.data[None,t+self.seq_num:t+self.seq_num+self.seq_num_op,:]        
+            output_seq[snum,:] = self.data[None,t+self.seq_num+self.seq_num_gap:t+self.seq_num+self.seq_num_gap+self.seq_num_op,:]        
             snum = snum + 1
 
         # Shuffle dataset
@@ -78,18 +80,56 @@ class standard_lstm(Model):
 
         # Define architecture
         xavier=tf.keras.initializers.GlorotUniform()
-
-        # self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len))
-        # self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
-        # self.l2=tf.keras.layers.LSTM(50,return_sequences=True)
-        # self.out = tf.keras.layers.Dense(self.state_len)
-        # self.train_op = tf.keras.optimizers.Adam(learning_rate=0.001)
-
-        self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu')
-        self.l2 = tf.keras.layers.RepeatVector(self.seq_num_op)
-        self.l3=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')       
-        self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
         self.train_op = tf.keras.optimizers.Adam(learning_rate=0.001)
+        self.model_choice = model_choice
+
+        if self.model_choice == 'LSTM':
+            self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len))
+            self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
+            self.l2=tf.keras.layers.LSTM(50,return_sequences=True)
+            self.out = tf.keras.layers.Dense(self.state_len)
+        
+        elif self.model_choice =='LSTM_REPEAT':
+
+            self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu')
+            self.l2= tf.keras.layers.RepeatVector(self.seq_num_op)
+            self.l3=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')       
+            self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
+
+        elif self.model_choice == 'LSTM_ATT':
+
+            self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu')
+            self.l2= tf.keras.layers.RepeatVector(self.seq_num_op)
+            self.l3_q=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')       
+            self.l3_v=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')       
+            self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
+
+        elif self.model_choice == 'LSTM_PROG':
+            if self.seq_num_gap != 0:
+                print('Progressive architecture only possible with zero output gap')
+                exit()
+
+            # Split prediction into three connected components
+            self.split_num_1 = int(self.seq_num_op//3)
+            self.split_num_2 = int(self.seq_num_op//3)
+            self.split_num_3 = self.seq_num_op - 2*self.split_num_1
+
+
+            self.l1_1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu',name='LSTM1_1')
+            self.l2_1= tf.keras.layers.RepeatVector(self.split_num_1,name='REPEAT_1')
+            self.l3_1=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu',name='LSTM1_2')       
+            self.out_1 = tf.keras.layers.Dense(self.state_len,name='OP_1')
+
+            self.l1_2=tf.keras.layers.LSTM(50,input_shape=(self.seq_num+self.split_num_1,self.state_len),activation='relu',name='LSTM2_1')
+            self.l2_2= tf.keras.layers.RepeatVector(self.split_num_2,name='REPEAT_2')
+            self.l3_2=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu',name='LSTM2_2')       
+            self.out_2 = tf.keras.layers.Dense(self.state_len,name='OP_2')
+
+            self.l1_3=tf.keras.layers.LSTM(50,input_shape=(self.seq_num+self.split_num_1++self.split_num_2,self.state_len),activation='relu',name='LSTM3_1')
+            self.l2_3= tf.keras.layers.RepeatVector(self.split_num_3,name='REPEAT_3')
+            self.l3_3=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu',name='LSTM3_2')
+            self.out_3 = tf.keras.layers.Dense(self.state_len,name='OP_3')
+
 
         # # Prioritize according to scaled singular values
         # self.singular_values = np.load('Singular_Values.npy')[:self.state_len]
@@ -106,44 +146,160 @@ class standard_lstm(Model):
 
     # Running the model
     def call(self,X):
-        # h1 = self.l1(X)
-        # h2 = tf.transpose(h1,perm=[0,2,1])
-        # h3 = self.l1_transform(h2)
-        # h4 = tf.transpose(h3,perm=[0,2,1])
-        # h5 = self.l2(h4)
-        # out = self.out(h5)
+        if self.model_choice == 'LSTM':
+            h1 = self.l1(X)
+            h2 = tf.transpose(h1,perm=[0,2,1])
+            h3 = self.l1_transform(h2)
+            h4 = tf.transpose(h3,perm=[0,2,1])
+            h5 = self.l2(h4)
+            out = self.out(h5)
 
-        h1 = self.l1(X)
-        h2 = self.l2(h1)
-        h3 = self.l3(h2)
-        out = self.out(h3)
+            return out
+        
+        elif self.model_choice == 'LSTM_REPEAT':
+            hh = self.l1(X)
+            hh = self.l2(hh)
+            hh = self.l3(hh)
+            out = self.out(hh)
+
+            return out
+
+        elif self.model_choice == 'LSTM_ATT':
+            hh = self.l1(X)
+            hh = self.l2(hh)
+            hh_q = self.l3_q(hh)
+            hh_v = self.l3_v(hh)
+
+            hh = tf.keras.layers.Attention()([hh_q,hh_v])
+            out = self.out(hh)
+
+            return out
+
+        elif self.model_choice == 'LSTM_PROG':
+
+            hh = self.l1_1(X)
+            hh = self.l2_1(hh)
+            hh = self.l3_1(hh)
+            out_1 = self.out_1(hh)
+
+            X_2 = tf.concat([X,out_1],axis=1)
+            hh = self.l1_2(X_2)
+            hh = self.l2_2(hh)
+            hh = self.l3_2(hh)
+            out_2 = self.out_2(hh)
+
+            X_3 = tf.concat([X,out_1,out_2],axis=1)
+            hh = self.l1_3(X_2)
+            hh = self.l2_3(hh)
+            hh = self.l3_3(hh)
+            out_3 = self.out_3(hh)
+
+            return out_1, out_2, out_3
+
+    def call_inference(self,X):
+        if self.model_choice != 'LSTM_PROG':
+            out = self.call(X)
+        else:
+            out_1, out_2, out_3 = self.call(X)
+            out = tf.concat([out_1,out_2,out_3],axis=1)
 
         return out
+
+    def get_loss_valid(self,X,Y):
+        if self.model_choice != 'LSTM_PROG':
+            out = self.get_loss(X,Y)
+        else:
+            out_1, out_2, out_3 = self.get_loss(X,Y)
+            out = out_1 + out_2 + out_3
+
+        return out
+
     
     # Regular MSE
     def get_loss(self,X,Y):
-        op=self.call(X)
 
-        temp = tf.reduce_mean(tf.math.square(op-Y),axis=0)
-        temp = tf.reduce_mean(temp,0)
-        temp = tf.reduce_mean(temp)
+        if self.model_choice != 'LSTM_PROG':
 
-        temp = temp + tf.reduce_sum(self.losses)
+            op=self.call(X)
 
-        return temp
+            temp = tf.reduce_mean(tf.math.square(op-Y),axis=0)
+            temp = tf.reduce_mean(temp,0)
+            temp = tf.reduce_mean(temp)
+
+            return temp
+
+        else:
+
+            op1, op2, op3 =self.call(X)
+
+            Y1 = Y[:,:self.split_num_1]
+            Y2 = Y[:,self.split_num_1:self.split_num_1+self.split_num_2]
+            Y3 = Y[:,self.split_num_1+self.split_num_2:]
+
+            temp1 = tf.reduce_mean(tf.math.square(op1-Y1),axis=0)
+            temp1 = tf.reduce_mean(temp1,0)
+            temp1 = tf.reduce_mean(temp1)
+
+
+            temp2 = tf.reduce_mean(tf.math.square(op2-Y2),axis=0)
+            temp2 = tf.reduce_mean(temp2,0)
+            temp2 = tf.reduce_mean(temp2)
+
+            temp3 = tf.reduce_mean(tf.math.square(op3-Y3),axis=0)
+            temp3 = tf.reduce_mean(temp3,0)
+            temp3 = tf.reduce_mean(temp3)
+
+            return temp1, temp2, temp3
+
 
     # get gradients - regular
     def get_grad(self,X,Y):
-        with tf.GradientTape() as tape:
-            tape.watch(self.trainable_variables)
-            L = self.get_loss(X,Y)
-            g = tape.gradient(L, self.trainable_variables)
-        return g
+        if self.model_choice != 'LSTM_PROG':
+            
+            with tf.GradientTape() as tape:
+                tape.watch(self.trainable_variables)
+                L = self.get_loss(X,Y)
+                g = tape.gradient(L, self.trainable_variables)
+            return g
+        
+        else:
+            
+            with tf.GradientTape(persistent=True) as tape:
+                tape.watch(self.trainable_variables)
+                L1, L2, L3 = self.get_loss(X,Y)
+
+                g1_trainable_variables= self.l1_1.trainable_variables + \
+                                        self.l2_1.trainable_variables + \
+                                        self.l3_1.trainable_variables + \
+                                        self.out_1.trainable_variables
+
+                g2_trainable_variables= self.l1_2.trainable_variables + \
+                                        self.l2_2.trainable_variables + \
+                                        self.l3_2.trainable_variables + \
+                                        self.out_2.trainable_variables
+
+                g3_trainable_variables= self.l1_3.trainable_variables + \
+                                        self.l2_3.trainable_variables + \
+                                        self.l3_3.trainable_variables + \
+                                        self.out_3.trainable_variables
+
+                g1 = tape.gradient(L1,g1_trainable_variables)
+                g2 = tape.gradient(L2,g2_trainable_variables)
+                g3 = tape.gradient(L3,g3_trainable_variables)
+
+            return g1, g2, g3, g1_trainable_variables, g2_trainable_variables, g3_trainable_variables
+
     
     # perform gradient descent - regular
     def network_learn(self,X,Y):
-        g = self.get_grad(X,Y)
-        self.train_op.apply_gradients(zip(g, self.trainable_variables))
+        if self.model_choice != 'LSTM_PROG':
+            g = self.get_grad(X,Y)
+            self.train_op.apply_gradients(zip(g, self.trainable_variables))
+        else:
+            g1, g2, g3, g1_trainable_variables, g2_trainable_variables, g3_trainable_variables = self.get_grad(X,Y)
+            self.train_op.apply_gradients(zip(g1,g1_trainable_variables))
+            self.train_op.apply_gradients(zip(g2,g2_trainable_variables))
+            self.train_op.apply_gradients(zip(g3,g3_trainable_variables))
 
     # Train the model
     def train_model(self):
@@ -170,11 +326,12 @@ class standard_lstm(Model):
             valid_r2 = 0.0
 
             for batch in range(self.num_batches):
+                
                 input_batch = self.input_seq_valid[batch*self.valid_batch_size:(batch+1)*self.valid_batch_size]
                 output_batch = self.output_seq_valid[batch*self.valid_batch_size:(batch+1)*self.valid_batch_size]
-
-                valid_loss = valid_loss + self.get_loss(input_batch,output_batch).numpy()
-                predictions = self.call(self.input_seq_valid)
+                            
+                valid_loss = valid_loss + self.get_loss_valid(input_batch,output_batch).numpy()
+                predictions = self.call_inference(self.input_seq_valid)
                 valid_r2 = valid_r2 + coeff_determination(predictions,self.output_seq_valid)
 
             valid_r2 = valid_r2/(batch+1)
@@ -219,15 +376,15 @@ class standard_lstm(Model):
             test_data = self.preproc_pipeline.transform(test_data)
 
         # Test data has to be scaled already
-        test_total_size = np.shape(test_data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
+        test_total_size = np.shape(test_data)[0]-int(self.seq_num_op+self.seq_num+self.seq_num_gap) # Limit of sampling
 
         # Non-recursive prediction
         forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
         true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
 
         for t in range(test_total_size):
-            forecast_array[t] = self.call(test_data[t:t+self.seq_num].reshape(-1,self.seq_num,self.state_len))
-            true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            forecast_array[t] = self.call_inference(test_data[t:t+self.seq_num].reshape(-1,self.seq_num,self.state_len))
+            true_array[t] = test_data[t+self.seq_num+self.seq_num_gap:t+self.seq_num+self.seq_num_gap+self.seq_num_op]
 
         # Rescale
         if self.scaling == 1:
@@ -257,7 +414,7 @@ class standard_lstm(Model):
             test_data = self.preproc_pipeline.transform(test_data)
 
         # Test data has to be scaled already
-        test_total_size = np.shape(test_data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
+        test_total_size = np.shape(test_data)[0]-int(self.seq_num_op+self.seq_num+self.seq_num_gap) # Limit of sampling
 
         # Non-recursive prediction
         forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
@@ -305,10 +462,11 @@ class standard_lstm(Model):
 
             # Scale
             if self.scaling == 1:
-                x_tf = self.call(x).numpy()[0].reshape(self.seq_num_op,-1)/self.scale_factor
+                x_tf = self.call_inference(x).numpy()[0].reshape(self.seq_num_op,-1)/self.scale_factor
                 x_tf = x_tf + self.trans_factor
+
             else:
-                x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+                x_tf = self.preproc_pipeline.inverse_transform(self.call_inference(x).numpy()[0].reshape(self.seq_num_op,-1))
 
             x_tf_rec = np.matmul(pod_modes,x_tf.T)
 
@@ -336,12 +494,12 @@ class standard_lstm(Model):
             # Likelihood
             x = x.reshape(1,self.seq_num,-1)
             
-            # Scale
             if self.scaling == 1:
-                x_tf = self.call(x).numpy()[0].reshape(self.seq_num_op,-1)/self.scale_factor
+                x_tf = self.call_inference(x).numpy()[0].reshape(self.seq_num_op,-1)/self.scale_factor
                 x_tf = x_tf + self.trans_factor
+
             else:
-                x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+                x_tf = self.preproc_pipeline.inverse_transform(self.call_inference(x).numpy()[0].reshape(self.seq_num_op,-1))
 
             x_tf_rec = np.matmul(pod_modes,x_tf.T)
 
@@ -385,8 +543,7 @@ class standard_lstm(Model):
                 t.watch(x)
 
                 x = tf.reshape(x,shape=[1,self.seq_num,-1])
-
-                op = self.call(x)[0]
+                op = self.call_inference(x)[0]
 
                 # Unscale
                 if self.scaling == 1:
@@ -433,7 +590,7 @@ class standard_lstm(Model):
             x_ti_rec = np.matmul(pod_modes,x_ti.T)#[:,0:1]
 
             # Observation
-            y_ = true_observations[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            y_ = true_observations[t+self.seq_num+self.seq_num_gap:t+self.seq_num+self.seq_num_gap+self.seq_num_op]
 
             # Perform optimization
             solution = minimize(residual,x_input.flatten(), jac=residual_gradient, method='SLSQP',
@@ -453,15 +610,15 @@ class standard_lstm(Model):
 
             if new_of< old_of:
                 assimilated_rec_input_seq = solution.x.reshape(1,self.seq_num,-1)
-                forecast_array[t] = self.call(assimilated_rec_input_seq).numpy()[0]
+                forecast_array[t] = self.call_inference(assimilated_rec_input_seq).numpy()[0]
                 obj_array[t,4] = 1
             else:
                 print('Optimization failed. Initial guess residual:',old_of, ', Final guess residual:',new_of)
                 x_input = x_input.reshape(1,self.seq_num,-1)
-                forecast_array[t] = self.call(x_input).numpy()[0]
+                forecast_array[t] = self.call_inference(x_input).numpy()[0]
 
             # Recording truth            
-            true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            true_array[t] = test_data[t+self.seq_num+self.seq_num_gap:t+self.seq_num+self.seq_num_gap+self.seq_num_op]
             
             print('Finished variational prediction for timestep: ',t)
 
@@ -492,7 +649,7 @@ class standard_lstm(Model):
             test_data = self.preproc_pipeline.transform(test_data)
 
         # Test data has to be scaled already
-        test_total_size = np.shape(test_data)[0]-int(self.seq_num_op)-int(self.seq_num) # Limit of sampling
+        test_total_size = np.shape(test_data)[0]-int(self.seq_num+self.seq_num_op+self.seq_num_gap) # Limit of sampling
 
         # Non-recursive prediction
         forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
@@ -550,10 +707,10 @@ class standard_lstm(Model):
             
             # Scale
             if self.scaling == 1:
-                x_tf = self.call(x).numpy()[0].reshape(self.seq_num_op,-1)/self.scale_factor
+                x_tf = self.call_inference(x).numpy()[0].reshape(self.seq_num_op,-1)/self.scale_factor
                 x_tf = x_tf + self.trans_factor
             else:
-                x_tf = self.preproc_pipeline.inverse_transform(self.call(x).numpy()[0].reshape(self.seq_num_op,-1))
+                x_tf = self.preproc_pipeline.inverse_transform(self.call_inference(x).numpy()[0].reshape(self.seq_num_op,-1))
 
             x_tf_rec = np.matmul(pod_modes,x_tf.T)
 
@@ -605,7 +762,7 @@ class standard_lstm(Model):
 
                 x = tf.concat([x_fixed_tf,x_var_tf],axis=1)
                 x = tf.reshape(x,shape=[1,self.seq_num,-1])
-                op = self.call(x)[0]
+                op = self.call_inference(x)[0]
 
                 # Unscale
                 if self.scaling == 1:
@@ -656,7 +813,7 @@ class standard_lstm(Model):
             x_ti_rec = np.matmul(pod_modes,x_ti.T)#[:,0:1]
 
             # Observation
-            y_ = true_observations[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            y_ = true_observations[t+self.seq_num+self.seq_num_gap:t+self.seq_num+self.seq_num_gap+self.seq_num_op]
 
             # Perform optimization
             solution = minimize(residual,x_var.flatten(), jac=residual_gradient, method='SLSQP',
@@ -670,16 +827,16 @@ class standard_lstm(Model):
             if new_of< old_of:
                 xtemp = solution.x.reshape(self.seq_num,-1)
                 x_solution = np.concatenate((x_fixed,xtemp),axis=1).reshape(1,self.seq_num,-1)
-                forecast_array[t] = self.call(x_solution).numpy()[0]
+                forecast_array[t] = self.call_inference(x_solution).numpy()[0]
 
             else:
 
                 print('Optimization failed. Initial guess residual:',old_of, ', Final guess residual:',new_of)
 
                 x_input = x_input.reshape(1,self.seq_num,-1)
-                forecast_array[t] = self.call(x_input).numpy()[0]
+                forecast_array[t] = self.call_inference(x_input).numpy()[0]
             
-            true_array[t] = test_data[t+self.seq_num:t+self.seq_num+self.seq_num_op]
+            true_array[t] = test_data[t+self.seq_num+self.seq_num_gap:t+self.seq_num+self.seq_num_gap+self.seq_num_op]
             
             print('Finished variational prediction for timestep: ',t)
 
