@@ -19,9 +19,9 @@ def perform_analyses(data_paths,var_time,cadence,num_ips,num_ops,output_gap,num_
     test_fields = test_fields.reshape(103,120,-1)[:,:,:var_time+num_ips+num_ops+output_gap]
     snapshots_mean = snapshots_mean.reshape(103,120)
 
-    persistence_maes = np.zeros(shape=(num_ops,len(subregions)),dtype='float32')
-    climatology_maes = np.zeros(shape=(num_ops,len(subregions)),dtype='float32')
-    predicted_maes = np.zeros(shape=(num_ops,len(subregions)),dtype='float32')
+    persistence_maes = np.zeros(shape=(num_ops,len(subregions)+1),dtype='float32')
+    climatology_maes = np.zeros(shape=(num_ops,len(subregions)+1),dtype='float32')
+    predicted_maes = np.zeros(shape=(num_ops,len(subregions)+1),dtype='float32')
 
     # Climatology calculation
     train_fields = np.load(data_paths['training_fields']).T
@@ -93,6 +93,18 @@ def perform_analyses(data_paths,var_time,cadence,num_ips,num_ops,output_gap,num_
 
             region_num+=1
 
+        # Total
+        region_num = -1
+        mae = np.mean(np.abs(persistence_fields-test_fields_temp))
+        persistence_maes[lead_time,region_num] = mae
+
+        mae = np.mean(np.abs(predicted-test_fields_temp))
+        predicted_maes[lead_time,region_num] = mae
+
+        mae = np.mean(np.abs(clim_fields-test_fields_temp))
+        climatology_maes[lead_time,region_num] = mae
+
+
         if lead_time == num_ops-1:
             # Visualizations
             pred_mae, pred_cos = plot_averaged_errors(test_fields_temp,predicted,snapshots_mean)
@@ -123,7 +135,7 @@ def perform_analyses(data_paths,var_time,cadence,num_ips,num_ops,output_gap,num_
     np.savetxt(save_path+'/climatology_maes.txt',climatology_maes)
 
     # Make a plot of them
-    plot_bars(persistence_maes,climatology_maes,predicted_maes,subregions,save_path)
+    plot_bars(persistence_maes[:,:-1],climatology_maes[:,:-1],predicted_maes[:,:-1],subregions,save_path)
 
 def plot_obj(obj_array,save_path):
     

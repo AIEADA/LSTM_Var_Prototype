@@ -59,3 +59,24 @@ for subregion in subregion_paths:
 
     iter_num+=1
 
+
+iter_num = -1
+fname = 'everything'
+plt.figure()
+plt.title('MAE for '+fname)
+plt.plot(persistence_maes[:,iter_num],label='Persistence')
+plt.plot(climatology_maes[:,iter_num],label='Climatology')
+plt.plot(regular_maes[:,iter_num],label='Regular')
+
+if var_data:
+    plt.plot(var_maes[:,iter_num],label='3DVar')
+
+if cvar_data:
+    plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
+
+plt.legend()
+plt.xlabel('Timesteps')
+plt.ylabel('MAE')
+plt.savefig(save_path+'/'+fname+'.png')
+plt.close()
+

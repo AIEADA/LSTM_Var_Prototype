@@ -84,16 +84,29 @@ class emulator(Model):
         self.model_choice = model_choice
 
         if self.model_choice == 'LSTM':
-            self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len))
+            self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len),activation='relu')
             self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
-            self.l2=tf.keras.layers.LSTM(50,return_sequences=True)
+            self.l2=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')
             self.out = tf.keras.layers.Dense(self.state_len)
+
+        elif self.model_choice == 'BLSTM':
+            
+            self.l1=tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'),input_shape=(self.seq_num,self.state_len))
+            self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
+            self.l2=tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'))
+            self.out = tf.keras.layers.Dense(self.state_len)            
         
-        elif self.model_choice =='LSTM_REPEAT':
+        elif self.model_choice == 'LSTM_REPEAT':
 
             self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu')
             self.l2= tf.keras.layers.RepeatVector(self.seq_num_op)
             self.l3=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')       
+            self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
+
+        elif self.model_choice == 'BLSTM_REPEAT':
+            self.l1= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,activation='relu'),input_shape=(self.seq_num,self.state_len),)
+            self.l2= tf.keras.layers.RepeatVector(self.seq_num_op)
+            self.l3= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'))
             self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
 
         elif self.model_choice == 'LSTM_ATT':
@@ -115,21 +128,21 @@ class emulator(Model):
             self.split_num_3 = self.seq_num_op - 2*self.split_num_1
 
 
-            self.l1_1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu',name='LSTM1_1')
+            self.l1_1= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,activation='relu'),input_shape=(self.seq_num,self.state_len),name='LSTM1_1')
             self.l2_1= tf.keras.layers.RepeatVector(self.split_num_1,name='REPEAT_1')
-            self.l3_1=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu',name='LSTM1_2')       
+            self.l3_1= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'),name='LSTM1_2')
             self.out_1 = tf.keras.layers.Dense(self.state_len,name='OP_1')
 
-            self.l1_2=tf.keras.layers.LSTM(50,input_shape=(self.seq_num+self.split_num_1,self.state_len),activation='relu',name='LSTM2_1')
             self.l2_2= tf.keras.layers.RepeatVector(self.split_num_2,name='REPEAT_2')
-            self.l3_2=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu',name='LSTM2_2')       
+            self.l3_2= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'),name='LSTM2_2')
             self.out_2 = tf.keras.layers.Dense(self.state_len,name='OP_2')
 
-            self.l1_3=tf.keras.layers.LSTM(50,input_shape=(self.seq_num+self.split_num_1++self.split_num_2,self.state_len),activation='relu',name='LSTM3_1')
             self.l2_3= tf.keras.layers.RepeatVector(self.split_num_3,name='REPEAT_3')
-            self.l3_3=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu',name='LSTM3_2')
+            self.l3_3= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'),name='LSTM3_2')
             self.out_3 = tf.keras.layers.Dense(self.state_len,name='OP_3')
 
+        # For future use of hyperparameters
+        self.params = params
 
         # # Prioritize according to scaled singular values
         # self.singular_values = np.load('Singular_Values.npy')[:self.state_len]
@@ -146,7 +159,8 @@ class emulator(Model):
 
     # Running the model
     def call(self,X):
-        if self.model_choice == 'LSTM':
+        
+        if self.model_choice == 'LSTM' or self.model_choice == 'BLSTM':
             h1 = self.l1(X)
             h2 = tf.transpose(h1,perm=[0,2,1])
             h3 = self.l1_transform(h2)
@@ -156,7 +170,7 @@ class emulator(Model):
 
             return out
         
-        elif self.model_choice == 'LSTM_REPEAT':
+        elif self.model_choice == 'LSTM_REPEAT' or self.model_choice == 'BLSTM_REPEAT':
             hh = self.l1(X)
             hh = self.l2(hh)
             hh = self.l3(hh)
@@ -182,14 +196,12 @@ class emulator(Model):
             hh = self.l3_1(hh)
             out_1 = self.out_1(hh)
 
-            X_2 = tf.concat([X,out_1],axis=1)
-            hh = self.l1_2(X_2)
+            hh = self.l1_1(X)
             hh = self.l2_2(hh)
             hh = self.l3_2(hh)
             out_2 = self.out_2(hh)
 
-            X_3 = tf.concat([X,out_1,out_2],axis=1)
-            hh = self.l1_3(X_2)
+            hh = self.l1_1(X)
             hh = self.l2_3(hh)
             hh = self.l3_3(hh)
             out_3 = self.out_3(hh)
@@ -222,9 +234,15 @@ class emulator(Model):
 
             op=self.call(X)
 
-            temp = tf.reduce_mean(tf.math.square(op-Y),axis=0)
-            temp = tf.reduce_mean(temp,0)
-            temp = tf.reduce_mean(temp)
+            if self.params[11] == 0:
+                temp = tf.reduce_mean(tf.math.square(op-Y),axis=0)
+                temp = tf.reduce_mean(temp,0)
+                temp = tf.reduce_mean(temp)
+
+            else:
+                temp = tf.reduce_mean(tf.math.abs(op-Y)/(tf.math.abs(Y)+1.0e-8),axis=0)
+                temp = tf.reduce_mean(temp,0)
+                temp = tf.reduce_mean(temp)
 
             return temp
 
@@ -236,18 +254,35 @@ class emulator(Model):
             Y2 = Y[:,self.split_num_1:self.split_num_1+self.split_num_2]
             Y3 = Y[:,self.split_num_1+self.split_num_2:]
 
-            temp1 = tf.reduce_mean(tf.math.square(op1-Y1),axis=0)
-            temp1 = tf.reduce_mean(temp1,0)
-            temp1 = tf.reduce_mean(temp1)
+            if self.params[11] == 0:
+
+                temp1 = tf.reduce_mean(tf.math.square(op1-Y1),axis=0)
+                temp1 = tf.reduce_mean(temp1,0)
+                temp1 = tf.reduce_mean(temp1)
 
 
-            temp2 = tf.reduce_mean(tf.math.square(op2-Y2),axis=0)
-            temp2 = tf.reduce_mean(temp2,0)
-            temp2 = tf.reduce_mean(temp2)
+                temp2 = tf.reduce_mean(tf.math.square(op2-Y2),axis=0)
+                temp2 = tf.reduce_mean(temp2,0)
+                temp2 = tf.reduce_mean(temp2)
 
-            temp3 = tf.reduce_mean(tf.math.square(op3-Y3),axis=0)
-            temp3 = tf.reduce_mean(temp3,0)
-            temp3 = tf.reduce_mean(temp3)
+                temp3 = tf.reduce_mean(tf.math.square(op3-Y3),axis=0)
+                temp3 = tf.reduce_mean(temp3,0)
+                temp3 = tf.reduce_mean(temp3)
+
+            else:
+
+                temp1 = tf.reduce_mean(tf.math.abs(op1-Y1)/(tf.math.abs(Y1)+1.0e-8),axis=0)
+                temp1 = tf.reduce_mean(temp1,0)
+                temp1 = tf.reduce_mean(temp1)
+
+
+                temp2 = tf.reduce_mean(tf.math.abs(op2-Y2)/(tf.math.abs(Y2)+1.0e-8),axis=0)
+                temp2 = tf.reduce_mean(temp2,0)
+                temp2 = tf.reduce_mean(temp2)
+
+                temp3 = tf.reduce_mean(tf.math.abs(op3-Y3)/(tf.math.abs(Y3)+1.0e-8),axis=0)
+                temp3 = tf.reduce_mean(temp3,0)
+                temp3 = tf.reduce_mean(temp3)
 
             return temp1, temp2, temp3
 
@@ -273,12 +308,12 @@ class emulator(Model):
                                         self.l3_1.trainable_variables + \
                                         self.out_1.trainable_variables
 
-                g2_trainable_variables= self.l1_2.trainable_variables + \
+                g2_trainable_variables= self.l1_1.trainable_variables + \
                                         self.l2_2.trainable_variables + \
                                         self.l3_2.trainable_variables + \
                                         self.out_2.trainable_variables
 
-                g3_trainable_variables= self.l1_3.trainable_variables + \
+                g3_trainable_variables= self.l1_1.trainable_variables + \
                                         self.l2_3.trainable_variables + \
                                         self.l3_3.trainable_variables + \
                                         self.out_3.trainable_variables
@@ -332,7 +367,9 @@ class emulator(Model):
                             
                 valid_loss = valid_loss + self.get_loss_valid(input_batch,output_batch).numpy()
                 predictions = self.call_inference(self.input_seq_valid)
-                valid_r2 = valid_r2 + coeff_determination(predictions,self.output_seq_valid)
+
+                if self.params[11] == 0:
+                    valid_r2 = valid_r2 + coeff_determination(predictions,self.output_seq_valid)
 
             valid_r2 = valid_r2/(batch+1)
 
@@ -350,7 +387,9 @@ class emulator(Model):
                 stop_iter = 0
             else:
                 print('Validation loss (no improvement):',valid_loss)
-                print('Validation R2:',valid_r2)
+
+                if self.params[11] == 0:
+                    print('Validation R2:',valid_r2)
                 stop_iter = stop_iter + 1
 
             if stop_iter == patience:
