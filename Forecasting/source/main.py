@@ -2,8 +2,14 @@ import os, yaml, sys, shutil
 current_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(current_dir)
 
-# Load YAML file for configuration
-config_file = open('config.yaml')
+# MPI Fluff for parallel training/inference
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+nprocs = comm.Get_size()
+
+# Load YAML file for configuration - unique for each rank
+config_file = open('config_'+str(rank)+'.yaml')
 configuration = yaml.load(config_file,Loader=yaml.FullLoader)
 
 data_paths = configuration['data_paths']
