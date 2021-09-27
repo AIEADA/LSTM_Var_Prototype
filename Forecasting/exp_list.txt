@@ -1,0 +1,5 @@
+Emulation study
+
+1. Effect of modes (Z500, PWAT) x Effect of output window (5, 10, 15, 20 x 5, 10, 15, 20) - LSTM_REPEAT
+2. Effect of modes (Z500, PWAT) x Effect of output window (5, 10, 15, 20 x 5, 10, 15, 20) - BLSTM_REPEAT
+3. Effect of modes (Z500, PWAT) x Effect of output window (5, 10, 15, 20 x 5, 10, 15, 20) - LSTM_ATT
