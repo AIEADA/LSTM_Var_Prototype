@@ -22,6 +22,10 @@ shutil.copyfile('config.yaml',data_paths['save_path']+'config.yaml')
 
 if __name__ == '__main__':
 
+    from time import time
+
+    start_time = time()
+
     import numpy as np
     np.random.seed(10)
     from lstm_archs import emulator
@@ -126,3 +130,6 @@ if __name__ == '__main__':
         else:
             print('No forecast for the test data with constrained 3D Var. Skipping analyses.')
 
+    end_time = time()
+
+    print('Total time taken:',end_time-start_time,' seconds')
