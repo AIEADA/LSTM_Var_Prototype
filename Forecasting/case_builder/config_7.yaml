@@ -18,13 +18,13 @@ data_paths:
   training_fields: data/Z500/Training_snapshots.npy
   training_mean: data/Z500/Training_mean.npy
 hyperparameters:
-- 2500
-- 10
-- 10
+- 5000
+- 30
+- 5
 - 0.7
 - 365
 - 500
-- 5
+- 10
 - 5
 - 1
 - 0
@@ -32,7 +32,7 @@ hyperparameters:
 - 0
 operation_mode:
   constrained_var: false
-  model_choice: BLSTM_REPEAT
+  model_choice: LSTM_ATT
   perform_analyses: true
   perform_var: true
   test: true

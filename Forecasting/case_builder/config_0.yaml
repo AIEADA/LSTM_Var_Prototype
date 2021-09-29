@@ -18,13 +18,13 @@ data_paths:
   training_fields: data/Z500/Training_snapshots.npy
   training_mean: data/Z500/Training_mean.npy
 hyperparameters:
-- 1250
-- 10
+- 5000
+- 20
 - 5
 - 0.7
 - 365
 - 500
-- 5
+- 10
 - 5
 - 1
 - 0

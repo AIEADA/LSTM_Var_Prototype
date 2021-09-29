@@ -19,12 +19,12 @@ data_paths:
   training_mean: data/Z500/Training_mean.npy
 hyperparameters:
 - 5000
-- 30
-- 5
+- 20
+- 15
 - 0.7
 - 365
 - 500
-- 5
+- 20
 - 5
 - 1
 - 0
