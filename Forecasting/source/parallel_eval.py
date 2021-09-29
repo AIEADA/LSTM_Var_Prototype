@@ -1,26 +1,36 @@
-# import os, yaml, sys, shutil
-# current_dir = os.path.abspath(os.path.dirname(__file__))
-# sys.path.append(current_dir)
+import ray
+ray.init(address="auto")
 
-# Load YAML file for configuration - unique for each rank
-config_file = open('config_'+str(rank)+'.yaml')
-configuration = yaml.load(config_file,Loader=yaml.FullLoader)
+# Export the function on workers with ressource utilization
+@ray.remote(num_cpus=1, num_gpus=1)
 
-data_paths = configuration['data_paths']
-subregion_paths = data_paths['subregions']
-operation_mode = configuration['operation_mode']
-model_choice = operation_mode['model_choice']
-hyperparameters = configuration.get('hyperparameters')
 
-config_file.close()
+# Import other libraries
+import os, yaml, sys, shutil
+current_dir = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(current_dir)
 
-# Location for test results
-if not os.path.exists(data_paths['save_path']):
-    os.makedirs(data_paths['save_path'])
-# Save the configuration file for reference
-shutil.copyfile('config.yaml',data_paths['save_path']+'config.yaml')
 
-if __name__ == '__main__':
+
+def model_run(config):
+    
+    # Load YAML file for configuration - unique for each rank
+    config_file = open('config_'+str(config)+'.yaml')
+    configuration = yaml.load(config_file,Loader=yaml.FullLoader)
+
+    data_paths = configuration['data_paths']
+    subregion_paths = data_paths['subregions']
+    operation_mode = configuration['operation_mode']
+    model_choice = operation_mode['model_choice']
+    hyperparameters = configuration.get('hyperparameters')
+
+    config_file.close()
+
+    # Location for test results
+    if not os.path.exists(data_paths['save_path']):
+        os.makedirs(data_paths['save_path'])
+    # Save the configuration file for reference
+    shutil.copyfile('config.yaml',data_paths['save_path']+'config.yaml')
 
     from time import time
 
@@ -87,7 +97,6 @@ if __name__ == '__main__':
         np.save(data_paths['save_path']+'/3DVar_Constrained/Predicted.npy',forecast)
             
 
-
     if operation_mode['perform_analyses']:
 
         from post_analyses import perform_analyses, plot_obj
@@ -130,6 +139,79 @@ if __name__ == '__main__':
         else:
             print('No forecast for the test data with constrained 3D Var. Skipping analyses.')
 
-    end_time = time()
+    # Perform postprocessing
+    import matplotlib.pyplot as plt
+    
+    # Load standard results
+	if os.path.exists(data_paths['save_path']+'/Regular/'):
+	    persistence_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'persistence_maes.txt')
+	    climatology_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'climatology_maes.txt')
+	    regular_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'predicted_maes.txt')
+	else:
+	    print('Regular forecasts do not exist. Stopping.')
+	    exit()
 
-    print('Total time taken:',end_time-start_time,' seconds')
+	var_data = True
+	if os.path.exists(data_paths['save_path']+'/3DVar/'):
+	    var_maes = np.loadtxt(data_paths['save_path']+'/3DVar/'+'predicted_maes.txt')
+	else:
+	    print('Warning: 3DVar forecasts do not exist.')
+	    var_data = False
+
+	cvar_data = True
+	if os.path.exists(data_paths['save_path']+'/3DVar_Constrained/'):
+	    cons_var_maes = np.loadtxt(data_paths['save_path']+'/3DVar_Constrained/'+'predicted_maes.txt')
+	else:
+	    print('Warning: Constrained 3DVar forecasts do not exist.')
+	    cvar_data = False
+
+	iter_num = 0
+	for subregion in subregion_paths:
+	    fname = subregion.split('/')[-1].split('_')[0]
+	    plt.figure()
+	    plt.title('MAE for '+fname)
+	    plt.plot(persistence_maes[:,iter_num],label='Persistence')
+	    plt.plot(climatology_maes[:,iter_num],label='Climatology')
+	    plt.plot(regular_maes[:,iter_num],label='Regular')
+
+	    if var_data:
+	        plt.plot(var_maes[:,iter_num],label='3DVar')
+
+	    if cvar_data:
+	        plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
+	    
+	    plt.legend()
+	    plt.xlabel('Timesteps')
+	    plt.ylabel('MAE')
+	    plt.savefig(save_path+'/'+fname+'.png')
+	    plt.close()
+
+	    iter_num+=1
+
+
+	iter_num = -1
+	fname = 'everything'
+	plt.figure()
+	plt.title('MAE for '+fname)
+	plt.plot(persistence_maes[:,iter_num],label='Persistence')
+	plt.plot(climatology_maes[:,iter_num],label='Climatology')
+	plt.plot(regular_maes[:,iter_num],label='Regular')
+
+	if var_data:
+	    plt.plot(var_maes[:,iter_num],label='3DVar')
+
+	if cvar_data:
+	    plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
+
+	plt.legend()
+	plt.xlabel('Timesteps')
+	plt.ylabel('MAE')
+	plt.savefig(save_path+'/'+fname+'.png')
+	plt.close()
+
+	end_time = time()
+
+    print('Total time taken for training and analysis:',end_time-start_time,' seconds from configuration ', config)
+
+CONFIGS = [0,1,2,3,4,5,6,7]
+ray.get([model_run.remote(config) for config in CONFIGS])

@@ -4,7 +4,7 @@ parent_path = os.path.dirname(dir_path)
 
 import tensorflow as tf
 tf.random.set_seed(10)
-tf.keras.backend.set_floatx('float64')
+# tf.keras.backend.set_floatx('float64')
 
 from tensorflow.keras import Model
 import numpy as np
