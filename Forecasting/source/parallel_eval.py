@@ -1,17 +1,13 @@
 import ray
-ray.init(address="auto")
-
-# Export the function on workers with ressource utilization
-@ray.remote(num_cpus=1, num_gpus=1)
-
-
 # Import other libraries
 import os, yaml, sys, shutil
 current_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(current_dir)
 
+ray.init(address="auto")
 
-
+# Export the function on workers with ressource utilization
+@ray.remote(num_cpus=1, num_gpus=1)
 def model_run(config):
     
     # Load YAML file for configuration - unique for each rank
@@ -141,75 +137,77 @@ def model_run(config):
 
     # Perform postprocessing
     import matplotlib.pyplot as plt
+    save_path = data_paths['save_path']
+    subregion_paths = data_paths['subregions']
     
     # Load standard results
-	if os.path.exists(data_paths['save_path']+'/Regular/'):
-	    persistence_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'persistence_maes.txt')
-	    climatology_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'climatology_maes.txt')
-	    regular_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'predicted_maes.txt')
-	else:
-	    print('Regular forecasts do not exist. Stopping.')
-	    exit()
+    if os.path.exists(data_paths['save_path']+'/Regular/'):
+        persistence_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'persistence_maes.txt')
+        climatology_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'climatology_maes.txt')
+        regular_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'predicted_maes.txt')
+    else:
+        print('Regular forecasts do not exist. Stopping.')
+        exit()
 
-	var_data = True
-	if os.path.exists(data_paths['save_path']+'/3DVar/'):
-	    var_maes = np.loadtxt(data_paths['save_path']+'/3DVar/'+'predicted_maes.txt')
-	else:
-	    print('Warning: 3DVar forecasts do not exist.')
-	    var_data = False
+    var_data = True
+    if os.path.exists(data_paths['save_path']+'/3DVar/'):
+        var_maes = np.loadtxt(data_paths['save_path']+'/3DVar/'+'predicted_maes.txt')
+    else:
+        print('Warning: 3DVar forecasts do not exist.')
+        var_data = False
 
-	cvar_data = True
-	if os.path.exists(data_paths['save_path']+'/3DVar_Constrained/'):
-	    cons_var_maes = np.loadtxt(data_paths['save_path']+'/3DVar_Constrained/'+'predicted_maes.txt')
-	else:
-	    print('Warning: Constrained 3DVar forecasts do not exist.')
-	    cvar_data = False
+    cvar_data = True
+    if os.path.exists(data_paths['save_path']+'/3DVar_Constrained/'):
+        cons_var_maes = np.loadtxt(data_paths['save_path']+'/3DVar_Constrained/'+'predicted_maes.txt')
+    else:
+        print('Warning: Constrained 3DVar forecasts do not exist.')
+        cvar_data = False
 
-	iter_num = 0
-	for subregion in subregion_paths:
-	    fname = subregion.split('/')[-1].split('_')[0]
-	    plt.figure()
-	    plt.title('MAE for '+fname)
-	    plt.plot(persistence_maes[:,iter_num],label='Persistence')
-	    plt.plot(climatology_maes[:,iter_num],label='Climatology')
-	    plt.plot(regular_maes[:,iter_num],label='Regular')
+    iter_num = 0
+    for subregion in subregion_paths:
+        fname = subregion.split('/')[-1].split('_')[0]
+        plt.figure()
+        plt.title('MAE for '+fname)
+        plt.plot(persistence_maes[:,iter_num],label='Persistence')
+        plt.plot(climatology_maes[:,iter_num],label='Climatology')
+        plt.plot(regular_maes[:,iter_num],label='Regular')
 
-	    if var_data:
-	        plt.plot(var_maes[:,iter_num],label='3DVar')
+        if var_data:
+            plt.plot(var_maes[:,iter_num],label='3DVar')
 
-	    if cvar_data:
-	        plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
-	    
-	    plt.legend()
-	    plt.xlabel('Timesteps')
-	    plt.ylabel('MAE')
-	    plt.savefig(save_path+'/'+fname+'.png')
-	    plt.close()
+        if cvar_data:
+            plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
+        
+        plt.legend()
+        plt.xlabel('Timesteps')
+        plt.ylabel('MAE')
+        plt.savefig(save_path+'/'+fname+'.png')
+        plt.close()
 
-	    iter_num+=1
+        iter_num+=1
 
 
-	iter_num = -1
-	fname = 'everything'
-	plt.figure()
-	plt.title('MAE for '+fname)
-	plt.plot(persistence_maes[:,iter_num],label='Persistence')
-	plt.plot(climatology_maes[:,iter_num],label='Climatology')
-	plt.plot(regular_maes[:,iter_num],label='Regular')
+    iter_num = -1
+    fname = 'everything'
+    plt.figure()
+    plt.title('MAE for '+fname)
+    plt.plot(persistence_maes[:,iter_num],label='Persistence')
+    plt.plot(climatology_maes[:,iter_num],label='Climatology')
+    plt.plot(regular_maes[:,iter_num],label='Regular')
 
-	if var_data:
-	    plt.plot(var_maes[:,iter_num],label='3DVar')
+    if var_data:
+        plt.plot(var_maes[:,iter_num],label='3DVar')
 
-	if cvar_data:
-	    plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
+    if cvar_data:
+        plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
 
-	plt.legend()
-	plt.xlabel('Timesteps')
-	plt.ylabel('MAE')
-	plt.savefig(save_path+'/'+fname+'.png')
-	plt.close()
+    plt.legend()
+    plt.xlabel('Timesteps')
+    plt.ylabel('MAE')
+    plt.savefig(save_path+'/'+fname+'.png')
+    plt.close()
 
-	end_time = time()
+    end_time = time()
 
     print('Total time taken for training and analysis:',end_time-start_time,' seconds from configuration ', config)
 

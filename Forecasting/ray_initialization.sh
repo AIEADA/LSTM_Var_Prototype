@@ -26,7 +26,8 @@ echo "Detected ${#WORKER_NODES[@]} workers with IPs: ${WORKER_NODES_IPS[@]}"
 RAY_PORT=6379
 
 echo "Starting HEAD at $HEAD_NODE_IP"
-ssh -tt $HEAD_NODE_IP "source $INIT_SCRIPT; \
+ssh -tt $HEAD_NODE_IP "source /lus/theta-fs0/software/thetagpu/conda/2021-06-28/mconda3/setup.sh && \
+                   conda activate /lus/eagle/projects/datascience/rmaulik/LSTM_Var_Prototype/AIAEDA; \
     ray start --head --node-ip-address=$HEAD_NODE_IP --port=$RAY_PORT \
     --num-cpus $CPUS_PER_NODE --num-gpus $GPUS_PER_NODE" &
 
@@ -42,7 +43,7 @@ for ((i=0; i < ${#WORKER_NODES_IPS[@]}; i++)); do
     sleep 5
 done
 
-ssh $HEAD_NODE_IP "source /lus/theta-fs0/software/thetagpu/conda/2021-06-28/mconda3/setup.sh && \
+ssh $HEAD_NODE_IP "cd $EXP_DIR && source /lus/theta-fs0/software/thetagpu/conda/2021-06-28/mconda3/setup.sh && \
                    conda activate /lus/eagle/projects/datascience/rmaulik/LSTM_Var_Prototype/AIAEDA && \
                    python source/parallel_eval.py"
 
