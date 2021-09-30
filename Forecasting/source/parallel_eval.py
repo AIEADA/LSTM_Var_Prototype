@@ -11,7 +11,7 @@ ray.init(address="auto")
 def model_run(config):
     
     # Load YAML file for configuration - unique for each rank
-    config_file = open('config_'+str(config)+'.yaml')
+    config_file = open('./case_builder/config_'+str(config)+'.yaml')
     configuration = yaml.load(config_file,Loader=yaml.FullLoader)
 
     data_paths = configuration['data_paths']
@@ -26,7 +26,7 @@ def model_run(config):
     if not os.path.exists(data_paths['save_path']):
         os.makedirs(data_paths['save_path'])
     # Save the configuration file for reference
-    shutil.copyfile('config.yaml',data_paths['save_path']+'config.yaml')
+    shutil.copyfile('./case_builder/config_'+str(config)+'.yaml',data_paths['save_path']+'config.yaml')
 
     from time import time
 
@@ -211,5 +211,5 @@ def model_run(config):
 
     print('Total time taken for training and analysis:',end_time-start_time,' seconds from configuration ', config)
 
-CONFIGS = [0,1,2,3,4,5,6,7]
+CONFIGS = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
 ray.get([model_run.remote(config) for config in CONFIGS])
