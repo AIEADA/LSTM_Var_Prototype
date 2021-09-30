@@ -1,6 +1,6 @@
 #!/bin/bash
 #COBALT -A datascience
-#COBALT -n 1
+#COBALT -n 2
 #COBALT -q full-node
 #COBALT -t 60
 
