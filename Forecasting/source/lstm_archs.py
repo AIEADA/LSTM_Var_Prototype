@@ -111,11 +111,11 @@ class emulator(Model):
 
         elif self.model_choice == 'LSTM_ATT':
 
-            self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu',return_sequences=True)
-            self.l2_q=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')       
+            # Query key
+            self.l1=tf.keras.layers.LSTM(self.state_len,input_shape=(self.seq_num,self.state_len),activation='relu',return_sequences=True)
 
-            self.l3 = tf.keras.layers.LSTM(50,activation='relu')
-            self.l4= tf.keras.layers.RepeatVector(self.seq_num_op)
+            self.l2 = tf.keras.layers.LSTM(50,activation='relu')
+            self.l3= tf.keras.layers.RepeatVector(self.seq_num_op)
 
             self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
 
@@ -182,12 +182,11 @@ class emulator(Model):
 
         elif self.model_choice == 'LSTM_ATT':
             hh = self.l1(X)
-            hh_q = self.l2_q(hh)
 
-            hh, att_scores = tf.keras.layers.Attention()([hh_q,hh],return_attention_scores=True)
+            hh, att_scores = tf.keras.layers.Attention()([hh,X],return_attention_scores=True)
 
+            hh = self.l2(hh)
             hh = self.l3(hh)
-            hh = self.l4(hh)
 
             out = self.out(hh)
 
@@ -216,14 +215,8 @@ class emulator(Model):
         if self.model_choice == 'LSTM_ATT':
             
             hh = self.l1(X)
-            hh_q = self.l2_q(hh)
 
-            hh, att_scores = tf.keras.layers.Attention()([hh_q,hh],return_attention_scores=True)
-
-            hh = self.l3(hh)
-            hh = self.l4(hh)
-
-            out = self.out(hh)
+            hh, att_scores = tf.keras.layers.Attention()([hh,X],return_attention_scores=True)
 
             return att_scores
         else:
