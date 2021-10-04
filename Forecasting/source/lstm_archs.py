@@ -184,8 +184,8 @@ class emulator(Model):
             hh_q = self.l3_q(hh)
             hh_v = self.l3_v(hh)
 
-            hh = tf.keras.layers.Attention()([hh_q,hh_v])
-            out = self.out(hh)
+            hh = tf.keras.layers.Attention()([hh_q,hh_v],return_attention_scores=True)
+            out, _ = self.out(hh)
 
             return out
 
@@ -208,13 +208,28 @@ class emulator(Model):
 
             return out_1, out_2, out_3
 
+    def get_att_scores(self,X):
+        if self.model_choice == 'LSTM_ATT':
+            
+            hh = self.l1(X)
+            hh = self.l2(hh)
+            hh_q = self.l3_q(hh)
+            hh_v = self.l3_v(hh)
+
+            hh = tf.keras.layers.Attention()([hh_q,hh_v],return_attention_scores=True)
+            out, att_scores = self.out(hh)
+
+            return att_scores
+        else:
+            print('Attention was not implemented')
+            return None
+
     def call_inference(self,X):
         if self.model_choice != 'LSTM_PROG':
             out = self.call(X)
-        else:
+        elif self.model_choice == 'LSTM_PROG':
             out_1, out_2, out_3 = self.call(X)
             out = tf.concat([out_1,out_2,out_3],axis=1)
-
         return out
 
     def get_loss_valid(self,X,Y):
@@ -421,8 +436,15 @@ class emulator(Model):
         forecast_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
         true_array = np.zeros(shape=(test_total_size,self.seq_num_op,self.state_len))
 
+        if self.model_choice == 'LSTM_ATT':
+            att_array = []            
+
         for t in range(test_total_size):
             forecast_array[t] = self.call_inference(test_data[t:t+self.seq_num].reshape(-1,self.seq_num,self.state_len))
+            
+            if self.model_choice == 'LSTM_ATT':
+                att_array.append(self.get_att_scores(test_data[t:t+self.seq_num].reshape(-1,self.seq_num,self.state_len)))
+            
             true_array[t] = test_data[t+self.seq_num+self.seq_num_gap:t+self.seq_num+self.seq_num_gap+self.seq_num_op]
 
         # Rescale
@@ -438,8 +460,10 @@ class emulator(Model):
                 forecast_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(forecast_array[:,lead_time,:])
                 true_array[:,lead_time,:] = self.preproc_pipeline.inverse_transform(true_array[:,lead_time,:])
 
-
-        return true_array, forecast_array
+        if self.model_choice == 'LSTM_ATT':
+            return true_array, forecast_array, np.asarray(att_array)
+        else:
+            return true_array, forecast_array
 
     def variational_inference(self,test_data,train_fields,test_fields,pod_modes,training_mean):
         # Restore from checkpoint
