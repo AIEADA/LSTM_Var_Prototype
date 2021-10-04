@@ -1,9 +1,9 @@
-# import os, yaml, sys, shutil
-# current_dir = os.path.abspath(os.path.dirname(__file__))
-# sys.path.append(current_dir)
+import os, yaml, sys, shutil
+current_dir = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(current_dir)
 
 # Load YAML file for configuration - unique for each rank
-config_file = open('config_'+str(rank)+'.yaml')
+config_file = open('config.yaml')
 configuration = yaml.load(config_file,Loader=yaml.FullLoader)
 
 data_paths = configuration['data_paths']
@@ -45,12 +45,26 @@ if __name__ == '__main__':
     if operation_mode['test']:
         
         test_data = np.load(data_paths['testing_coefficients']).T[:,:num_modes]
-        true, forecast = lstm_model.regular_inference(test_data)
 
-        if not os.path.exists(data_paths['save_path']+'/Regular/'):
-            os.makedirs(data_paths['save_path']+'/Regular/')    
-        np.save(data_paths['save_path']+'/Regular/True.npy',true)
-        np.save(data_paths['save_path']+'/Regular/Predicted.npy',forecast)
+        if model_choice != 'LSTM_ATT':
+
+            true, forecast = lstm_model.regular_inference(test_data)
+
+            if not os.path.exists(data_paths['save_path']+'/Regular/'):
+                os.makedirs(data_paths['save_path']+'/Regular/')    
+            np.save(data_paths['save_path']+'/Regular/True.npy',true)
+            np.save(data_paths['save_path']+'/Regular/Predicted.npy',forecast)
+
+        else:
+
+            true, forecast, att_scores = lstm_model.regular_inference(test_data)
+
+            if not os.path.exists(data_paths['save_path']+'/Regular/'):
+                os.makedirs(data_paths['save_path']+'/Regular/')    
+            np.save(data_paths['save_path']+'/Regular/True.npy',true)
+            np.save(data_paths['save_path']+'/Regular/Predicted.npy',forecast)
+            np.save(data_paths['save_path']+'/Regular/Scores.npy',att_scores)
+
 
     # 3DVar testing of model
     if operation_mode['perform_var']:
@@ -101,9 +115,11 @@ if __name__ == '__main__':
         if os.path.isfile(data_paths['save_path']+'/Regular/Predicted.npy'):
             forecast = np.load(data_paths['save_path']+'/Regular/Predicted.npy')
             test_fields = np.load(data_paths['da_testing_fields'])
+
             perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
                             test_fields,forecast,
                             data_paths['save_path']+'/Regular/',subregion_paths)
+            
         else:
             print('No forecast for the test data. Skipping analyses.')
         

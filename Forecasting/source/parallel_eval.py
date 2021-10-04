@@ -50,13 +50,24 @@ def model_run(config):
     # Regular testing of model
     if operation_mode['test']:
         
-        test_data = np.load(data_paths['testing_coefficients']).T[:,:num_modes]
-        true, forecast = lstm_model.regular_inference(test_data)
+        if model_choice != 'LSTM_ATT':
 
-        if not os.path.exists(data_paths['save_path']+'/Regular/'):
-            os.makedirs(data_paths['save_path']+'/Regular/')    
-        np.save(data_paths['save_path']+'/Regular/True.npy',true)
-        np.save(data_paths['save_path']+'/Regular/Predicted.npy',forecast)
+            true, forecast = lstm_model.regular_inference(test_data)
+
+            if not os.path.exists(data_paths['save_path']+'/Regular/'):
+                os.makedirs(data_paths['save_path']+'/Regular/')    
+            np.save(data_paths['save_path']+'/Regular/True.npy',true)
+            np.save(data_paths['save_path']+'/Regular/Predicted.npy',forecast)
+
+        else:
+
+            true, forecast, att_scores = lstm_model.regular_inference(test_data)
+
+            if not os.path.exists(data_paths['save_path']+'/Regular/'):
+                os.makedirs(data_paths['save_path']+'/Regular/')    
+            np.save(data_paths['save_path']+'/Regular/True.npy',true)
+            np.save(data_paths['save_path']+'/Regular/Predicted.npy',forecast)
+            np.save(data_paths['save_path']+'/Regular/Scores.npy',att_scores)
 
     # 3DVar testing of model
     if operation_mode['perform_var']:
