@@ -101,10 +101,9 @@ if __name__ == '__main__':
         np.save(data_paths['save_path']+'/3DVar_Constrained/Predicted.npy',forecast)
             
 
-
     if operation_mode['perform_analyses']:
 
-        from post_analyses import perform_analyses, plot_obj
+        from post_analyses import perform_analyses, plot_obj, plot_attention
 
         num_inputs = hyperparameters[1]
         num_outputs = hyperparameters[2]
@@ -119,6 +118,10 @@ if __name__ == '__main__':
             perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
                             test_fields,forecast,
                             data_paths['save_path']+'/Regular/',subregion_paths)
+
+            if os.path.isfile(data_paths['save_path']+'/Regular/Scores.npy'):
+                scores = np.load(data_paths['save_path']+'/Regular/Scores.npy')
+                plot_attention(scores,data_paths['save_path']+'/Regular/')
             
         else:
             print('No forecast for the test data. Skipping analyses.')

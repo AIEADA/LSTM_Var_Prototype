@@ -1,53 +1,82 @@
 import os, sys, yaml
-from shutil import copyfile
-run_dir = os.getcwd()
 current_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(current_dir)
-sys.path.append(run_dir+'/case_builder')
 
 import numpy as np
 import matplotlib.pyplot as plt
-from Case_builder import num_modes_list, input_len_list, output_len_list, method_list, var_num_list
 
+# Load YAML file for configuration
+config_file = open('config.yaml')
+configuration = yaml.load(config_file,Loader=yaml.FullLoader)
+data_paths = configuration['data_paths']
+save_path = data_paths['save_path']
+subregion_paths = data_paths['subregions']
+config_file.close()
 
-os.mkdir(run_dir+'/results/comparisons/')
+# Load standard results
+if os.path.exists(data_paths['save_path']+'/Regular/'):
+    persistence_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'persistence_maes.txt')
+    climatology_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'climatology_maes.txt')
+    regular_maes = np.loadtxt(data_paths['save_path']+'/Regular/'+'predicted_maes.txt')
+else:
+    print('Regular forecasts do not exist. Stopping.')
+    exit()
+
+var_data = True
+if os.path.exists(data_paths['save_path']+'/3DVar/'):
+    var_maes = np.loadtxt(data_paths['save_path']+'/3DVar/'+'predicted_maes.txt')
+else:
+    print('Warning: 3DVar forecasts do not exist.')
+    var_data = False
+
+cvar_data = True
+if os.path.exists(data_paths['save_path']+'/3DVar_Constrained/'):
+    cons_var_maes = np.loadtxt(data_paths['save_path']+'/3DVar_Constrained/'+'predicted_maes.txt')
+else:
+    print('Warning: Constrained 3DVar forecasts do not exist.')
+    cvar_data = False
 
 iter_num = 0
-for num_modes in num_modes_list:
+for subregion in subregion_paths:
+    fname = subregion.split('/')[-1].split('_')[0]
+    plt.figure()
+    plt.title('MAE for '+fname)
+    plt.plot(persistence_maes[:,iter_num],label='Persistence')
+    plt.plot(climatology_maes[:,iter_num],label='Climatology')
+    plt.plot(regular_maes[:,iter_num],label='Regular')
+
+    if var_data:
+        plt.plot(var_maes[:,iter_num],label='3DVar')
+
+    if cvar_data:
+        plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
     
-    try:
-        os.mkdir(run_dir+'/results/comparisons/modes_'+str(num_modes))
-    except:
-        print(run_dir+'/results/comparisons/modes_'+str(num_modes)+' already exists. Moving on.')
+    plt.legend()
+    plt.xlabel('Timesteps')
+    plt.ylabel('MAE')
+    plt.savefig(save_path+'/'+fname+'.png')
+    plt.close()
 
-    mode_path = run_dir+'/results/comparisons/modes_'+str(num_modes)
-    
-    for input_len in input_len_list:
+    iter_num+=1
 
-        try:
-            os.mkdir(mode_path+'/input_len_'+str(input_len))
-        except:
-            print(mode_path+'/input_len_'+str(input_len)+' already exists. Moving on.')
 
-        input_path = mode_path+'/input_len_'+str(input_len)
-        
-        for output_len in output_len_list:
+iter_num = -1
+fname = 'everything'
+plt.figure()
+plt.title('MAE for '+fname)
+plt.plot(persistence_maes[:,iter_num],label='Persistence')
+plt.plot(climatology_maes[:,iter_num],label='Climatology')
+plt.plot(regular_maes[:,iter_num],label='Regular')
 
-            try:
-                os.mkdir(input_path+'/output_len_'+str(output_len))
-            except:
-                print(input_path+'/output_len_'+str(output_len)+' already exists. Moving on.')
+if var_data:
+    plt.plot(var_maes[:,iter_num],label='3DVar')
 
-            output_path = input_path+'/output_len_'+str(output_len)
+if cvar_data:
+    plt.plot(cons_var_maes[:,iter_num],label='Constrained 3DVar')
 
-            for method in method_list:
+plt.legend()
+plt.xlabel('Timesteps')
+plt.ylabel('MAE')
+plt.savefig(save_path+'/'+fname+'.png')
+plt.close()
 
-                try:
-                    os.mkdir(output_path+'/method_'+str(method))
-                except:
-                    print(output_path+'/method_'+str(method)+' already exists. Moving on.')
-
-                
-                copyfile(run_dir+'/results/Experiment_'+str(iter_num)+'/everything.png',output_path+'/method_'+str(method)+'/MAE.png')
-
-                iter_num = iter_num + 1

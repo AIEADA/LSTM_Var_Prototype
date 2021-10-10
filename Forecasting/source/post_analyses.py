@@ -156,7 +156,35 @@ def plot_obj(obj_array,save_path):
     ax[1].set_xlabel('Timestep')
 
     if isinstance(save_path,str):
-        plt.savefig(save_path)
+        plt.savefig(save_path+'/OF_tracker.png')
+    plt.close()
+
+
+def plot_attention(scores,save_path):
+
+    from sklearn.preprocessing import MinMaxScaler
+
+    dim_1 = scores.shape[0]
+    dim_2 = scores.shape[1]
+    dim_3 = scores.shape[2]
+
+    scores = scores.reshape(dim_1,dim_2*dim_3)
+
+    scaler = MinMaxScaler()
+    scores = scaler.fit_transform(scores)
+
+    scores = scores.reshape(dim_1,dim_2,dim_3)
+
+    average_1 = np.mean(scores,axis=0)
+
+    plt.figure()
+    plt.imshow(average_1)
+    plt.colorbar()
+    plt.xlabel('Days')
+    plt.xlabel('Days')
+    
+    if isinstance(save_path,str):
+        plt.savefig(save_path+'/Attention_Plot.png')
     plt.close()
 
 

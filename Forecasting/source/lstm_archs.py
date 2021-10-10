@@ -111,13 +111,18 @@ class emulator(Model):
 
         elif self.model_choice == 'LSTM_ATT':
 
-            # Query key
-            self.l1=tf.keras.layers.LSTM(self.state_len,input_shape=(self.seq_num,self.state_len),activation='relu',return_sequences=True)
-
-            self.l2 = tf.keras.layers.LSTM(50,activation='relu')
-            self.l3= tf.keras.layers.RepeatVector(self.seq_num_op)
-
+            self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu')
+            self.l2= tf.keras.layers.RepeatVector(self.seq_num_op)
+            self.l3=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')              
             self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
+
+            # # Query key
+            # self.l1=tf.keras.layers.LSTM(self.state_len,input_shape=(self.seq_num,self.state_len),activation='relu',return_sequences=True)
+
+            # self.l2 = tf.keras.layers.LSTM(50,activation='relu')
+            # self.l3= tf.keras.layers.RepeatVector(self.seq_num_op)
+
+            # self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
 
         elif self.model_choice == 'LSTM_PROG':
             if self.seq_num_gap != 0:
@@ -182,15 +187,25 @@ class emulator(Model):
 
         elif self.model_choice == 'LSTM_ATT':
             hh = self.l1(X)
-
-            hh, att_scores = tf.keras.layers.Attention()([hh,X],return_attention_scores=True)
-
             hh = self.l2(hh)
             hh = self.l3(hh)
 
+            hh = tf.keras.layers.Attention()([hh,hh])
             out = self.out(hh)
 
             return out
+
+
+            # hh = self.l1(X)
+
+            # hh, att_scores = tf.keras.layers.Attention()([hh,X],return_attention_scores=True)
+
+            # hh = self.l2(hh)
+            # hh = self.l3(hh)
+
+            # out = self.out(hh)
+
+            # return out
 
         elif self.model_choice == 'LSTM_PROG':
 
@@ -213,12 +228,20 @@ class emulator(Model):
 
     def get_att_scores(self,X):
         if self.model_choice == 'LSTM_ATT':
-            
+
             hh = self.l1(X)
+            hh = self.l2(hh)
+            hh = self.l3(hh)
 
-            hh, att_scores = tf.keras.layers.Attention()([hh,X],return_attention_scores=True)
-
+            hh, att_scores = tf.keras.layers.Attention()([hh,hh],return_attention_scores=True)
+            
             return att_scores
+            
+            # hh = self.l1(X)
+
+            # hh, att_scores = tf.keras.layers.Attention()([hh,X],return_attention_scores=True)
+
+            # return att_scores
         else:
             print('Attention was not implemented')
             return None
