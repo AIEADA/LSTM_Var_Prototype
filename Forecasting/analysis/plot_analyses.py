@@ -27,9 +27,9 @@ output_gap = hyperparameters[10]
 config_file.close()
 
 # Save path
-forecast = np.load('./Regular/Predicted.npy')
-save_path = './Regular/'
-plot_day = 10
+forecast = np.load('./3DVar/Predicted.npy')
+save_path = './3DVar/'
+plot_day = 14
 
 
 pod_modes = np.load(parent_path+'/'+data_paths['pod_modes'])[:,:num_modes]
@@ -155,8 +155,37 @@ for lead_time in range(num_ops):
 # Make a plot of them
 plot_bars(persistence_maes[:,:-1],climatology_maes[:,:-1],predicted_maes[:,:-1],subregion_paths,save_path)
 
-iter_num = -1 # All regions
-fname = 'everything'
+
+
+for iter_num in range(persistence_maes.shape[-1]-1):
+
+    fname = subregion_paths[iter_num].split('/')[-1].split('.')[0].split('_')[0]
+    plt.figure()
+    plt.title('MAE for '+fname)
+    plt.plot(persistence_maes[:,iter_num],label='Persistence')
+    plt.plot(climatology_maes[:,iter_num],label='Climatology')
+
+    try:
+        reg_maes = np.loadtxt('./Regular/predicted_maes.txt')
+        plt.plot(reg_maes[:,iter_num],label='Regular')
+    except:
+        print('Regular analysis not done')
+
+    try:
+        var_maes = np.loadtxt('./3DVar/predicted_maes.txt')
+        plt.plot(var_maes[:,iter_num],label='3DVar')
+    except:
+        print('Var analysis not done')
+
+
+    plt.legend()
+    plt.xlabel('Timesteps')
+    plt.ylabel('MAE')
+    plt.savefig(fname+'.png')
+    plt.close()
+
+
+fname = 'North_America'
 plt.figure()
 plt.title('MAE for '+fname)
 plt.plot(persistence_maes[:,iter_num],label='Persistence')
