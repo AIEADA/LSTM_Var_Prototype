@@ -159,6 +159,7 @@ class emulator(Model):
         # self.singular_values[:] = 1.0
 
         # 3D VAR duration
+        self.var_start = params[12]
         self.var_duration = params[4]
 
         # Some LSTM specifics
@@ -233,9 +234,10 @@ class emulator(Model):
 
             hh = self.l1(X)
             hh = self.l2(hh)
-            hh = self.l3(hh)
+            hh_q = self.l3_q(hh)
+            hh_v = self.l3_v(hh)
 
-            hh, att_scores = tf.keras.layers.Attention()([hh,hh],return_attention_scores=True)
+            hh, att_scores = tf.keras.layers.Attention()([hh_q,hh_v],return_attention_scores=True)
             
             return att_scores
             
@@ -662,7 +664,7 @@ class emulator(Model):
 
         # 3D-Variational update
         var_time = self.var_duration
-        for t in range(var_time):
+        for t in range(self.var_start, self.var_start+self.var_duration):
 
             # Background vector - initial time window input
             x_input = test_data[t:t+self.seq_num].reshape(self.seq_num,self.state_len)
@@ -881,7 +883,7 @@ class emulator(Model):
 
         # 3D-Variational update
         var_time = self.var_duration
-        for t in range(var_time):
+        for t in range(self.var_start, self.var_start+self.var_duration):
 
             # Background vector - initial time window input
             x_input = test_data[t:t+self.seq_num].reshape(self.seq_num,self.state_len)

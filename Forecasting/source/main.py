@@ -110,12 +110,13 @@ if __name__ == '__main__':
         var_time = hyperparameters[4]
         cadence = hyperparameters[8]
         output_gap = hyperparameters[10]
+        var_start = hyperparameters[12]
 
         if os.path.isfile(data_paths['save_path']+'/Regular/Predicted.npy'):
             forecast = np.load(data_paths['save_path']+'/Regular/Predicted.npy')
             test_fields = np.load(data_paths['da_testing_fields'])
 
-            perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
+            perform_analyses(data_paths,var_start, var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
                             test_fields,forecast,
                             data_paths['save_path']+'/Regular/',subregion_paths)
 
@@ -129,7 +130,7 @@ if __name__ == '__main__':
         if os.path.isfile(data_paths['save_path']+'/3DVar/Predicted.npy'):
             forecast = np.load(data_paths['save_path']+'/3DVar/Predicted.npy')
             test_fields = np.load(data_paths['da_testing_fields'])
-            perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
+            perform_analyses(data_paths,var_start, var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
                             test_fields,forecast,
                             data_paths['save_path']+'/3DVar/',subregion_paths)
 
@@ -143,7 +144,7 @@ if __name__ == '__main__':
         if os.path.isfile(data_paths['save_path']+'/3DVar_Constrained/Predicted.npy'):
             forecast = np.load(data_paths['save_path']+'/3DVar_Constrained/Predicted.npy')
             test_fields = np.load(data_paths['da_testing_fields'])
-            perform_analyses(data_paths,var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
+            perform_analyses(data_paths,var_start,var_time,cadence,num_inputs,num_outputs,output_gap,num_modes,
                             test_fields,forecast,
                             data_paths['save_path']+'/3DVar_Constrained/',subregion_paths)
         else:

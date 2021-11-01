@@ -16,7 +16,7 @@ data_paths:
   da_testing_fields: 'data/Z500/Testing_snapshots.npy'
 
   # Save locations
-  save_path: 'results/Z500_ATT/'
+  save_path: 'results/Paper_test/'
 
   # Coordinate paths
   cood_path: 'data/Z500/'
@@ -33,17 +33,17 @@ data_paths:
     - 'data/subregions/Southwest_coarse.nc'
 
 operation_mode:
-  train: True
-  test: True # Perform test forecasts
-  perform_var: True # Perform 3D Var
+  train: False
+  test: False # Perform test forecasts
+  perform_var: False # Perform 3D Var
   constrained_var: False # Constrain some scales during 3DVar - only if perform_var is True
   perform_analyses: True # Perform analyses on finished forecasts
-  model_choice: 'LSTM_ATT' # LSTM, LSTM_REPEAT, LSTM_ATT, LSTM_PROG, BLSTM, BLSTM_REPEAT
+  model_choice: 'LSTM_REPEAT' # LSTM, LSTM_REPEAT, LSTM_ATT, LSTM_PROG, BLSTM, BLSTM_REPEAT
 
 hyperparameters:
   - 5000 # num_observations
-  - 30 #input window
-  - 15 #output window
+  - 28 #input window
+  - 21 #output window
   - 0.7 # Train-valid split
   - 365 # 3D Var duration in test regime
   - 500 # Number of LSTM training epochs
@@ -53,3 +53,4 @@ hyperparameters:
   - 0 # Scaling 0-Minmax, 1-Affine
   - 0 # Output window gap
   - 0 # 0-MSE, 1-MAPE
+  - 365 # Start of var process

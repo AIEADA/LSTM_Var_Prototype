@@ -49,6 +49,8 @@ def model_run(config):
 
     # Regular testing of model
     if operation_mode['test']:
+
+        test_data = np.load(data_paths['testing_coefficients']).T[:,:num_modes]
         
         if model_choice != 'LSTM_ATT':
 
