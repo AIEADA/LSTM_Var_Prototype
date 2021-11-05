@@ -8,7 +8,7 @@ ray.init(address="auto")
 
 # Export the function on workers with ressource utilization
 @ray.remote(num_cpus=1, num_gpus=1)
-def model_run(config):
+def model_train_parallel(config):
     
     # Load YAML file for configuration - unique for each rank
     config_file = open('./case_builder/config_'+str(config)+'.yaml')
@@ -45,7 +45,52 @@ def model_run(config):
     
     # Training model
     if operation_mode['train']:
-        lstm_model.train_model()
+        valid_loss = lstm_model.train_model()
+        with open(data_paths['save_path']+'/loss_value.txt','w') as f:
+            f.write(str(valid_loss))
+        f.close()
+
+    end_time = time()
+
+    print('Total time taken for training:',end_time-start_time,' seconds from configuration ', config)
+
+
+# Export the function on workers with ressource utilization
+@ray.remote(num_cpus=1, num_gpus=1)
+def model_test_parallel(config):
+
+    # Load YAML file for configuration - unique for each rank
+    config_file = open('./case_builder/config_'+str(config)+'.yaml')
+    configuration = yaml.load(config_file,Loader=yaml.FullLoader)
+
+    data_paths = configuration['data_paths']
+    subregion_paths = data_paths['subregions']
+    operation_mode = configuration['operation_mode']
+    model_choice = operation_mode['model_choice']
+    hyperparameters = configuration.get('hyperparameters')
+
+    config_file.close()
+
+    # Location for test results
+    if not os.path.exists(data_paths['save_path']):
+        os.makedirs(data_paths['save_path'])
+    # Save the configuration file for reference
+    shutil.copyfile('./case_builder/config_'+str(config)+'.yaml',data_paths['save_path']+'config.yaml')
+
+    from time import time
+
+    start_time = time()
+
+    import numpy as np
+    np.random.seed(10)
+    from lstm_archs import emulator
+
+    # Loading data
+    num_modes = hyperparameters[6]
+    train_data = np.load(data_paths['training_coefficients']).T[:,:num_modes]
+
+    # Initialize model
+    lstm_model = emulator(train_data,data_paths['save_path'],hyperparameters,model_choice)
 
     # Regular testing of model
     if operation_mode['test']:
@@ -222,7 +267,40 @@ def model_run(config):
 
     end_time = time()
 
-    print('Total time taken for training and analysis:',end_time-start_time,' seconds from configuration ', config)
+    print('Total time taken for analysis:',end_time-start_time,' seconds from configuration ', config)
 
-CONFIGS = list(range(0,54))
-ray.get([model_run.remote(config) for config in CONFIGS])
+
+if __name__ == '__main__':
+    # Train the models
+    CONFIGS = list(range(0,54))
+    ray.get([model_train_parallel.remote(config) for config in CONFIGS])
+
+    # Find the best validation performance
+    BEST_CONFIGS = []
+    for config in CONFIGS:
+        # Load YAML file for configuration - unique for each rank
+        config_file = open('./case_builder/config_'+str(config)+'.yaml')
+        configuration = yaml.load(config_file,Loader=yaml.FullLoader)
+
+        data_paths = configuration['data_paths']
+
+        with open(data_paths['save_path']+'/loss_value.txt','r') as f:
+            BEST_CONFIGS.append(float(f.readlines()[0]))
+        f.close()
+
+        config_file.close()
+
+    # Sort for best performance
+    BEST_CONFIGS = np.asarray(BEST_CONFIGS)
+    best_idx = np.argsort(BEST_CONFIGS)
+
+    TEST_CONFIGS = []
+    for i in range(10):
+        TEST_CONFIGS.append(CONFIGS[best_idx[i]])
+
+    with open('best_configurations.txt','w') as f:
+        for config in TEST_CONFIGS:
+            f.write(config+"\n")
+    f.close()
+
+    ray.get([model_test_parallel.remote(config) for config in TEST_CONFIGS])

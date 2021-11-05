@@ -84,43 +84,43 @@ class emulator(Model):
         self.model_choice = model_choice
 
         if self.model_choice == 'LSTM':
-            self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len),activation='relu')
+            self.l1=tf.keras.layers.LSTM(50,return_sequences=True,input_shape=(self.seq_num,self.state_len),activation='swish')
             self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
-            self.l2=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')
+            self.l2=tf.keras.layers.LSTM(50,return_sequences=True,activation='swish')
             self.out = tf.keras.layers.Dense(self.state_len)
 
         elif self.model_choice == 'BLSTM':
             
-            self.l1=tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'),input_shape=(self.seq_num,self.state_len))
+            self.l1=tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='swish'),input_shape=(self.seq_num,self.state_len))
             self.l1_transform = tf.keras.layers.Dense(self.seq_num_op)
-            self.l2=tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'))
+            self.l2=tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='swish'))
             self.out = tf.keras.layers.Dense(self.state_len)            
         
         elif self.model_choice == 'LSTM_REPEAT':
 
-            self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu')
+            self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='swish')
             self.l2= tf.keras.layers.RepeatVector(self.seq_num_op)
-            self.l3=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')       
+            self.l3=tf.keras.layers.LSTM(50,return_sequences=True,activation='swish')       
             self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
 
         elif self.model_choice == 'BLSTM_REPEAT':
-            self.l1= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,activation='relu'),input_shape=(self.seq_num,self.state_len),)
+            self.l1= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,activation='swish'),input_shape=(self.seq_num,self.state_len),)
             self.l2= tf.keras.layers.RepeatVector(self.seq_num_op)
-            self.l3= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'))
+            self.l3= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='swish'))
             self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
 
         elif self.model_choice == 'LSTM_ATT':
 
-            self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='relu')
+            self.l1=tf.keras.layers.LSTM(50,input_shape=(self.seq_num,self.state_len),activation='swish')
             self.l2= tf.keras.layers.RepeatVector(self.seq_num_op)
-            self.l3_q=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')              
-            self.l3_v=tf.keras.layers.LSTM(50,return_sequences=True,activation='relu')              
+            self.l3_q=tf.keras.layers.LSTM(50,return_sequences=True,activation='swish')              
+            self.l3_v=tf.keras.layers.LSTM(50,return_sequences=True,activation='swish')              
             self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
 
             # # Query key
-            # self.l1=tf.keras.layers.LSTM(self.state_len,input_shape=(self.seq_num,self.state_len),activation='relu',return_sequences=True)
+            # self.l1=tf.keras.layers.LSTM(self.state_len,input_shape=(self.seq_num,self.state_len),activation='swish',return_sequences=True)
 
-            # self.l2 = tf.keras.layers.LSTM(50,activation='relu')
+            # self.l2 = tf.keras.layers.LSTM(50,activation='swish')
             # self.l3= tf.keras.layers.RepeatVector(self.seq_num_op)
 
             # self.out = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.state_len))
@@ -136,17 +136,17 @@ class emulator(Model):
             self.split_num_3 = self.seq_num_op - 2*self.split_num_1
 
 
-            self.l1_1= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,activation='relu'),input_shape=(self.seq_num,self.state_len),name='LSTM1_1')
+            self.l1_1= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,activation='swish'),input_shape=(self.seq_num,self.state_len),name='LSTM1_1')
             self.l2_1= tf.keras.layers.RepeatVector(self.split_num_1,name='REPEAT_1')
-            self.l3_1= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'),name='LSTM1_2')
+            self.l3_1= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='swish'),name='LSTM1_2')
             self.out_1 = tf.keras.layers.Dense(self.state_len,name='OP_1')
 
             self.l2_2= tf.keras.layers.RepeatVector(self.split_num_2,name='REPEAT_2')
-            self.l3_2= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'),name='LSTM2_2')
+            self.l3_2= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='swish'),name='LSTM2_2')
             self.out_2 = tf.keras.layers.Dense(self.state_len,name='OP_2')
 
             self.l2_3= tf.keras.layers.RepeatVector(self.split_num_3,name='REPEAT_3')
-            self.l3_3= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='relu'),name='LSTM3_2')
+            self.l3_3= tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(50,return_sequences=True,activation='swish'),name='LSTM3_2')
             self.out_3 = tf.keras.layers.Dense(self.state_len,name='OP_3')
 
         # For future use of hyperparameters
@@ -435,6 +435,8 @@ class emulator(Model):
 
             if stop_iter == patience:
                 break
+
+        return best_valid_loss
 
     # Load weights
     def restore_model(self):
