@@ -271,6 +271,7 @@ def model_test_parallel(config):
 
 
 if __name__ == '__main__':
+    import numpy as np
     # Train the models
     CONFIGS = list(range(0,54))
     ray.get([model_train_parallel.remote(config) for config in CONFIGS])
@@ -300,7 +301,7 @@ if __name__ == '__main__':
 
     with open('best_configurations.txt','w') as f:
         for config in TEST_CONFIGS:
-            f.write(config+"\n")
+            f.write(str(config)+"\n")
     f.close()
 
     ray.get([model_test_parallel.remote(config) for config in TEST_CONFIGS])
