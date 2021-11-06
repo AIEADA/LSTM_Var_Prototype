@@ -108,7 +108,7 @@ def perform_analyses(data_paths,var_start,var_time,cadence,num_ips,num_ops,outpu
         climatology_maes[lead_time,region_num] = mae
 
 
-        if lead_time == 13:
+        if lead_time == 10:
             # Visualizations
             pred_mae, pred_cos = plot_averaged_errors(test_fields_temp,predicted,snapshots_mean)
             pers_mae, pers_cos = plot_averaged_errors(test_fields_temp,persistence_fields,snapshots_mean)
