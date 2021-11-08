@@ -434,7 +434,12 @@ class emulator(Model):
                 stop_iter = stop_iter + 1
 
             if stop_iter == patience:
-                break
+                self.train_op._hyper['learning_rate'] = 0.5*self.train_op._hyper['learning_rate']
+                print('Reduced learning rate to',self.train_op._hyper['learning_rate'])
+                stop_iter = 0
+                
+                if self.train_op._hyper['learning_rate'] < 1e-5:
+                    break
 
         return best_valid_loss
 
