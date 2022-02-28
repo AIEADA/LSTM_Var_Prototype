@@ -35,6 +35,6 @@ operation_mode:
   constrained_var: false
   model_choice: LSTM_ATT
   perform_analyses: true
-  perform_var: true
-  test: true
+  perform_var: false
+  test: false
   train: false
