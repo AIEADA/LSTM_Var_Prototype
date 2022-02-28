@@ -10,3 +10,6 @@ python source/comparisons.py
 
 ### Note
 Running the forecast overwrites prior results so please save `results/Paper_test_III/` to a backup.
+
+
+Reach out to rmaulik@anl.gov for any questions/clarifications.
