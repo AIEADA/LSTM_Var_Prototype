@@ -148,7 +148,7 @@ def main():
     train_dataset = get_data()
     model = define_model()
 
-    checkpointing = ModelCheckpoint(filepath='/checkpoints', save_weights_only=True, save_freq='epoch')
+    checkpointing = ModelCheckpoint(filepath='weights.{epoch:02d}.hdf5', save_weights_only=True, save_freq='epoch')
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
                                 patience=5, min_lr=0.0001)
     early_stop = EarlyStopping(monitor='val_loss',patience=20)
@@ -156,7 +156,7 @@ def main():
     #model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),loss='mean_squared_error',loss_weights=[1,1])
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),loss='mean_squared_error')
     model.summary()
-    history = model.fit(train_dataset,epochs=5,callbacks=[checkpointing])
+    history = model.fit(train_dataset,epochs=5,callbacks=[checkpointing], verbose=2)
     with open('/trainHistoryDict', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
 
