@@ -1,0 +1,10 @@
+#!/bin/bash -l
+#COBALT -n 1
+#COBALT -t 0:20:00
+#COBALT -A datascience
+#COBALT -q single-gpu
+
+module load conda/2022-07-01
+conda activate
+cd ~/LSTM_Var_Prototype/Autoencoder/
+python AE_LSTM_Physical_Pipelined_CNN.py
