@@ -156,7 +156,7 @@ def main():
     #model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),loss='mean_squared_error',loss_weights=[1,1])
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),loss='mean_squared_error')
     model.summary()
-    history = model.fit(train_dataset,epochs=5,callbacks=[checkpointing], verbose=2)
+    history = model.fit(train_dataset,epochs=50,callbacks=[checkpointing], verbose=2)
     with open('history.pkl', 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
 
