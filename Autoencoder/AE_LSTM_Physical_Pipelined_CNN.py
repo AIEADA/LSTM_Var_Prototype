@@ -47,7 +47,7 @@ def build_dataset(batch_size, directory):
     
     return train_dataset
 
-def get_data():
+def get_data(batch_size):
     # In physical space use 'raw_train.reshape(-1,121,281)' to visualize original
     #num_snapshots = 12564
     #directory = '/lcrc/project/AIEADA-2/era5_data/full_data/snapshots/'
@@ -60,7 +60,6 @@ def get_data():
 
 
     #example = np.load(directory + 'split_examples/train_data_z500_2d/example_151.npy')
-    batch_size = 32
     train_dataset = build_dataset(batch_size, directory)
     return train_dataset
 
@@ -69,14 +68,14 @@ def autoencoder1():
     ae_encoding_layers = []
     # TimeDistributed will apply the same layer to each snapshot in time (same weights)
     # https://keras.io/api/layers/recurrent_layers/time_distributed/
-    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 122, 282, 50)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 122, 282, 50)
     ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,2),padding='same'))) # (None, 14, 61, 141, 50)
-    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 62, 142, 25)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 62, 142, 25)
     ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,2),padding='same'))) # (None, 14, 31, 71, 25)
     ae_encoding_layers.append(layers.TimeDistributed(layers.ZeroPadding2D(padding=((1,0),(1,0)))))
-    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 31, 71, 12)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 31, 71, 12)
     ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,3),padding='same'))) # (None, 14, 16, 24, 12)
-    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 16, 24, 6) 
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 16, 24, 6) 
     ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,3),padding='same'))) # [None, 14, 8, 8, 6]
     ae_encoding_layers.append(layers.TimeDistributed(layers.Flatten())) # [None, 14, 384]
     ae_encoding_layers.append(layers.TimeDistributed(layers.Dense(encode_dim, activation=None))) # [None, 14, 180]
@@ -84,16 +83,16 @@ def autoencoder1():
         
     # decoder for reconstruction
     ae_decoding_layers = []
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Dense(384, activation='elu'))) # (None, 14, 384) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Dense(384, activation='relu'))) # (None, 14, 384) 
     ae_decoding_layers.append(layers.TimeDistributed(layers.Reshape((8, 8, 6)))) #  (None, 14, 8, 8, 6)
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 8, 8, 6)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 8, 8, 6)
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,3)))) # (None, 14, 16, 24, 6)
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 16, 24, 12)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 16, 24, 12)
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,3)))) # (None, 14, 32, 72, 12) 
     ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) # (None, 14, 31, 71, 12) 
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 31, 71, 25) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 31, 71, 25) 
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,2)))) # (None, 14, 62, 142, 25) 
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 62, 142, 50)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 62, 142, 50)
     ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) # (None, 14, 61, 141, 50) 
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,2)))) #  (None, 14, 122, 282, 50)
     ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) #  (None, 14, 121, 281, 50)
@@ -105,16 +104,16 @@ def autoencoder2():
     ae_encoding_layers = []
     # TimeDistributed will apply the same layer to each snapshot in time (same weights)
     # https://keras.io/api/layers/recurrent_layers/time_distributed/
-    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 122, 282, 50)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 122, 282, 50)
     ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,2),padding='same'))) # (None, 14, 61, 141, 50)
-    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 62, 142, 25)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 62, 142, 25)
     ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,2),padding='same'))) # (None, 14, 31, 71, 25)
     ae_encoding_layers.append(layers.TimeDistributed(layers.ZeroPadding2D(padding=((1,0),(1,0)))))
-    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 31, 71, 12)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 31, 71, 12)
     ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,3),padding='same'))) # (None, 14, 16, 24, 12)
-    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 16, 24, 6) 
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 16, 24, 6) 
     ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,3),padding='same'))) # [None, 14, 8, 8, 6]
-    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=3, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # [None, 14, 8, 8, 3]
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=3, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # [None, 14, 8, 8, 3]
     ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,2),padding='same'))) # [None, 14, 4, 4, 3]
     ae_encoding_layers.append(layers.TimeDistributed(layers.Flatten())) # [None, 14, 48]
     ae_encoding_layers.append(layers.TimeDistributed(layers.Dense(encode_dim, activation=None))) # [None, 14, 5]
@@ -122,18 +121,18 @@ def autoencoder2():
         
     # decoder for reconstruction
     ae_decoding_layers = []
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Dense(48, activation='elu'))) # (None, 14, 48) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Dense(48, activation='relu'))) # (None, 14, 48) 
     ae_decoding_layers.append(layers.TimeDistributed(layers.Reshape((4, 4, 3)))) #  (None, 14, 4, 4, 3)
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=3, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 4, 4, 3)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=3, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 4, 4, 3)
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,2)))) # (None, 14, 8, 8, 3)
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 8, 8, 6)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 8, 8, 6)
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,3)))) # (None, 14, 16, 24, 6)
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 16, 24, 12)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 16, 24, 12)
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,3)))) # (None, 14, 32, 72, 12) 
     ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) # (None, 14, 31, 71, 12) 
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 31, 71, 25) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 31, 71, 25) 
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,2)))) # (None, 14, 62, 142, 25) 
-    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 62, 142, 50)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='relu',padding='same'))) # (None, 14, 62, 142, 50)
     ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) # (None, 14, 61, 141, 50) 
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,2)))) #  (None, 14, 122, 282, 50)
     ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) #  (None, 14, 121, 281, 50)
@@ -160,7 +159,7 @@ class Autoencoder(tf.keras.models.Model):
         # decoder for prediction    
         #lstm_decoding_layers = []
         #lstm_decoding_layers.append(layers.RepeatVector(output_window))
-        #lstm_decoding_layers.append(layers.LSTM(100,activation='elu', return_sequences=True))
+        #lstm_decoding_layers.append(layers.LSTM(100,activation='relu', return_sequences=True))
         #lstm_decoding_layers.append(layers.TimeDistributed(layers.Dense(embed_dim)))
         # Encode from physical space
         #print('Input shape:',self.inputs.get_shape().as_list())
@@ -191,8 +190,8 @@ class Autoencoder(tf.keras.models.Model):
         return recon
 
 
-def load_and_evaluate(filename, model_name):
-    train_dataset = get_data()
+def load_and_evaluate(filename, model_name, batch_size):
+    train_dataset = get_data(batch_size)
     model = define_model(model_name)
     model.load_weights(filename) #'weights.35.hdf5')
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),loss='mean_squared_error')
@@ -230,17 +229,17 @@ def training(train_dataset, model, learning_rate, num_epochs, folder_name):
         model.save_weights(filepath='%s/weights%d.hdf5' % (folder_name, epoch))
     np.save('%s/losses.npy' % folder_name, losses)
 
-def main_custom_training(folder_name="exp1", model_name='autoencoder1', num_epochs=50):
+def main_custom_training(folder_name="exp1", model_name='autoencoder1', num_epochs=50, batch_size=32):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
-    train_dataset = get_data()
+    train_dataset = get_data(batch_size)
     model = Autoencoder(model_name)
     training(train_dataset, model, 0.001, num_epochs, folder_name)
 
-def main(folder_name="exp1", model_name='autoencoder1', num_epochs=50):
+def main(folder_name="exp1", model_name='autoencoder1', num_epochs=50, batch_size=32):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
-    train_dataset = get_data()
+    train_dataset = get_data(batch_size)
     model = Autoencoder(model_name)
 
     checkpointing = ModelCheckpoint(filepath='%s/weights.{epoch:02d}.hdf5' % folder_name, save_weights_only=True, save_freq='epoch')
@@ -256,4 +255,4 @@ def main(folder_name="exp1", model_name='autoencoder1', num_epochs=50):
         pickle.dump(history.history, file_pi)
 
 if __name__ == "__main__":
-    main_custom_training(folder_name="exp3", model_name='autoencoder2', num_epochs=2)
+    main_custom_training(folder_name="exp3", model_name='autoencoder2', num_epochs=2, batch_size=16)
