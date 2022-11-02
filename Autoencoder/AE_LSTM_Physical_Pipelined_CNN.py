@@ -6,6 +6,7 @@ from tensorflow.keras import layers
 from tensorflow.keras.callbacks import ReduceLROnPlateau,EarlyStopping, ModelCheckpoint
 import glob
 import pickle
+import os
 
 
 
@@ -65,15 +66,8 @@ def get_data():
     train_dataset = build_dataset(batch_size, directory)
     return train_dataset
 
-def define_model():
-    lat = 121
-    long = 281
-
+def autoencoder1():
     encode_dim = 180
-    input_window = 14
-    #output_window = 7
-
-    inputs = layers.Input(shape=(input_window,lat,long,1)) # (None, 14, 121, 281)
     ae_encoding_layers = []
     # TimeDistributed will apply the same layer to each snapshot in time (same weights)
     # https://keras.io/api/layers/recurrent_layers/time_distributed/
@@ -106,6 +100,60 @@ def define_model():
     ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,2)))) #  (None, 14, 122, 282, 50)
     ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) #  (None, 14, 121, 281, 50)
     ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=1,kernel_size=(1,1),activation=None,padding='same'))) # (None, 14, 121, 281, 1) 
+    return ae_encoding_layers, ae_decoding_layers
+
+def autoencoder2():
+    encode_dim = 180
+    ae_encoding_layers = []
+    # TimeDistributed will apply the same layer to each snapshot in time (same weights)
+    # https://keras.io/api/layers/recurrent_layers/time_distributed/
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 122, 282, 50)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,2),padding='same'))) # (None, 14, 61, 141, 50)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 62, 142, 25)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,2),padding='same'))) # (None, 14, 31, 71, 25)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.ZeroPadding2D(padding=((1,0),(1,0)))))
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 31, 71, 12)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,3),padding='same'))) # (None, 14, 16, 24, 12)
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 16, 24, 6) 
+    ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,3),padding='same'))) # [None, 14, 8, 8, 6]
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=3, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # [None, 14, 8, 8, 3]
+    ae_encoding_layers.append(layers.TimeDistributed(layers.MaxPooling2D((2,2),padding='same'))) # [None, 14, 4, 4, 3]
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Flatten())) # [None, 14, 48]
+    ae_encoding_layers.append(layers.TimeDistributed(layers.Dense(encode_dim, activation=None))) # [None, 14, 5]
+
+        
+    # decoder for reconstruction
+    ae_decoding_layers = []
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Dense(48, activation='elu'))) # (None, 14, 48) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Reshape((4, 4, 3)))) #  (None, 14, 4, 4, 3)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=3, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 4, 4, 3)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,2)))) # (None, 14, 8, 8, 3)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=6, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 8, 8, 6)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,3)))) # (None, 14, 16, 24, 6)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=12, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 16, 24, 12)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,3)))) # (None, 14, 32, 72, 12) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) # (None, 14, 31, 71, 12) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=25, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 31, 71, 25) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,2)))) # (None, 14, 62, 142, 25) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=50, kernel_size=(3,3), strides=(1,1),activation='elu',padding='same'))) # (None, 14, 62, 142, 50)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) # (None, 14, 61, 141, 50) 
+    ae_decoding_layers.append(layers.TimeDistributed(layers.UpSampling2D((2,2)))) #  (None, 14, 122, 282, 50)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Cropping2D(cropping=((1, 0), (1, 0))))) #  (None, 14, 121, 281, 50)
+    ae_decoding_layers.append(layers.TimeDistributed(layers.Conv2D(filters=1,kernel_size=(1,1),activation=None,padding='same'))) # (None, 14, 121, 281, 1) 
+    return ae_encoding_layers, ae_decoding_layers
+
+def define_model(model_name):
+    lat = 121
+    long = 281
+
+    input_window = 14
+    #output_window = 7
+
+    inputs = layers.Input(shape=(input_window,lat,long,1)) # (None, 14, 121, 281)
+    if model_name == 'autoencoder1':
+        ae_encoding_layers, ae_decoding_layers = autoencoder1()
+    elif model_name == 'autoencoder2':
+        ae_encoding_layers, ae_decoding_layers = autoencoder2()
 
     # NOTE: commenting out this section for now to try to just get an autoencoder
     # decoder for prediction    
@@ -144,20 +192,30 @@ def define_model():
     model = tf.keras.Model(inputs=inputs, outputs=recon)
     return model
 
-def main():
+def load_and_evaluate(filename, model_name):
     train_dataset = get_data()
-    model = define_model()
+    model = define_model(model_name)
+    model.load_weights(filename) #'weights.35.hdf5')
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),loss='mean_squared_error')
+    train_loss = model.evaluate(train_dataset, verbose=2)
+    print("Restored model, training loss: {:5.2f}%" % train_loss)
 
-    checkpointing = ModelCheckpoint(filepath='weights.{epoch:02d}.hdf5', save_weights_only=True, save_freq='epoch')
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
-                                patience=5, min_lr=0.0001)
-    early_stop = EarlyStopping(monitor='val_loss',patience=20)
+def main(folder_name="exp1", model_name='autoencoder1', num_epochs=50):
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+    train_dataset = get_data()
+    model = define_model(model_name)
+
+    checkpointing = ModelCheckpoint(filepath='%s/weights.{epoch:02d}.hdf5' % folder_name, save_weights_only=True, save_freq='epoch')
+    #reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+    #                            patience=5, min_lr=0.0001)
+    #early_stop = EarlyStopping(monitor='val_loss',patience=20)
 
     #model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),loss='mean_squared_error',loss_weights=[1,1])
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),loss='mean_squared_error')
     model.summary()
-    history = model.fit(train_dataset,epochs=50,callbacks=[checkpointing], verbose=2)
-    with open('history.pkl', 'wb') as file_pi:
+    history = model.fit(train_dataset,epochs=num_epochs,callbacks=[checkpointing], verbose=2)
+    with open('%s/history.pkl' % folder_name, 'wb') as file_pi:
         pickle.dump(history.history, file_pi)
 
 if __name__ == "__main__":
