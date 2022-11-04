@@ -7,4 +7,4 @@
 module load conda/2022-07-01
 conda activate
 cd ~/LSTM_Var_Prototype/Autoencoder/
-python AE_LSTM_Physical_Pipelined_CNN.py
+TF_XLA_FLAGS=--tf_xla_auto_jit=2 python exp7.py
